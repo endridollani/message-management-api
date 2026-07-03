@@ -370,3 +370,22 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   high-watermark or flood-stage behavior. P8 restored the transient
   Elasticsearch disk-threshold setting after smoke verification.
 - Next action: no implementation phase remains; project is ready for handoff.
+
+## 2026-07-03 - CI pnpm setup fix
+
+- Scope: fixed the GitHub Actions pnpm cache setup order. Each workflow job that
+  configures `actions/setup-node@v4` with `cache: pnpm` now runs
+  `pnpm/action-setup@v4` first with pnpm 11.1.1 and `run_install: false`, and
+  uses `cache-dependency-path: pnpm-lock.yaml`.
+- Files touched: `.github/workflows/ci.yml`, `docs/progress-log.md`, and
+  `docs/handoff.md`.
+- Validation, using the repo-pinned pnpm 11.1.1 through Corepack:
+  - Inspected `.github/workflows/ci.yml` for pnpm setup ordering and cache
+    dependency path.
+  - `pnpm run typecheck` - passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration all green with the
+    known KafkaJS warning/coordinator noise.
+  - `pnpm run build` - passed.
+- Open issues: none for the CI setup fix.
+- Next action: rerun the GitHub Actions workflow on the PR branch.

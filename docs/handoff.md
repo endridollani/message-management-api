@@ -6,6 +6,12 @@ P8 is complete. The message-management API is ready for handoff with API,
 outbox-publisher, search-indexer, CLI, tests, CI workflow, Docker targets,
 README, runbooks, observability docs, and security docs in place.
 
+Post-P8 CI setup fix: GitHub Actions now installs pnpm with
+`pnpm/action-setup@v4` before `actions/setup-node@v4` enables `cache: pnpm` in
+each cached job. The workflow pins pnpm 11.1.1, sets `run_install: false`, uses
+`cache-dependency-path: pnpm-lock.yaml`, and still runs
+`pnpm install --frozen-lockfile` explicitly.
+
 Final validation found one real recovery defect: the search-indexer could miss
 messages published while it was stopped if the consumer group had no committed
 offset for the target partition. The indexer now subscribes with
