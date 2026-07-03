@@ -2,10 +2,11 @@
 
 ## Current Status
 
-P3 core API system-of-record path is implemented. pnpm build/test/lint are green with
-pnpm 11.1.1. The API now supports authenticated message creation with transactional
-Message + OutboxEvent writes, and authenticated cursor-paginated conversation message
-listing.
+P4A is complete: the messaging library and outbox-publisher worker are implemented
+and validated. pnpm build/test/lint are green with pnpm 11.1.1. The API still
+supports authenticated message creation with transactional Message + OutboxEvent
+writes and authenticated cursor-paginated conversation message listing; P4A did
+not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands.
 
 ## Complete
 
@@ -32,11 +33,29 @@ listing.
     mappers, `POST /api/messages`, and `GET /api/conversations/:conversationId/messages`.
   - Contract tests use `MongoMemoryReplSet`; unit tests cover the transaction helper,
     create service, cursor utilities, and list service.
+- P4A is complete:
+  - `libs/messaging` wraps KafkaJS with topic constants, Kafka client lifecycle,
+    topic initialization for `messages.message-created.v1` and
+    `messages.message-created.v1.dlq`, Kafka readiness, and a JSON producer that
+    sends with `acks: -1`.
+  - KafkaJS producer idempotence is intentionally not enabled; correctness remains
+    the outbox at-least-once contract plus downstream idempotency.
+  - `apps/outbox-publisher` exposes health/readiness/metrics on
+    `OUTBOX_HEALTH_PORT` and runs a publisher loop that claims due pending events,
+    reclaims expired publishing leases, publishes with outbox `topic`/`key`/`payload`,
+    marks published with the lock-owner-safe filter, schedules exponential
+    backoff + jitter retries, and marks rows terminal `failed` after max attempts.
+  - Outbox publisher metrics now cover published/failed counters, pending count,
+    oldest pending age, and publish latency.
+  - Unit tests cover claim/publish/mark flow, retry/backoff, max attempts to
+    failed, expired lease reclaim query, lock-owner-safe no-match behavior, topic
+    initialization, and producer `acks: -1`.
 
 ## Remaining
 
-- P4 is next when requested: messaging lib, outbox publisher worker, Elasticsearch
-  search/indexer path, and search endpoint behavior.
+- Remaining P4 work is explicitly out of scope for P4A: Elasticsearch search lib,
+  search-indexer worker, search endpoint behavior, DLQ consumer/redrive behavior,
+  and CLI commands.
 
 ## Known Issues
 
@@ -46,20 +65,28 @@ listing.
   `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
 - No separate e2e script exists yet. P3 API contract tests are included in
   `pnpm run test`.
-- API readiness now checks MongoDB. Elasticsearch readiness is intentionally deferred
-  until P4 adds the search endpoint and ES client.
+- API readiness checks MongoDB. Elasticsearch readiness is intentionally deferred
+  until the search endpoint and ES client are implemented.
+- Host-run local runtimes should use
+  `mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true`
+  because the local replica set advertises the container hostname internally.
 
 ## Last Commands
 
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @nestjs/mongoose mongoose` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -Dw mongodb-memory-server supertest @types/supertest` - initially exited 1 because pnpm ignored the `mongodb-memory-server` build script pending approval; dependencies were added.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs approve-builds mongodb-memory-server` - passed using pnpm 11.1.1; downloaded MongoDB 8.2.6 for `mongodb-memory-server`.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed during implementation for strict typing; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - initially failed before renaming the e2e spec and fixing the `supertest` import; final rerun passed with 11 test suites and 24 tests.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w kafkajs` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed for strict test mock casts; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed using pnpm 11.1.1; 14 test suites and 33 tests passed.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for test lint cleanup; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for new-test unbound-method assertions and an unused parameter; final rerun passed.
+- `docker compose up -d mongodb mongodb-init kafka` - passed; MongoDB and Kafka were healthy.
+- Manual P4A publish verification - passed: inserted a pending
+  `manual-p4a-verify-20260703-2` outbox row, started the outbox publisher with
+  host-run `directConnection=true` MongoDB URI on `OUTBOX_HEALTH_PORT=3311`,
+  readiness returned 200, MongoDB row transitioned to `published`, and the event
+  appeared on Kafka topic `messages.message-created.v1`.
 
 ## Next Step
 
-Proceed to P4 only when requested: messaging lib, outbox publisher worker, search lib,
-search-indexer worker, and Elasticsearch-backed search endpoint behavior.
+Proceed to the next requested P4 slice only when requested: Elasticsearch search lib,
+search-indexer worker, Elasticsearch-backed search endpoint behavior, DLQ/redrive,
+or CLI commands.

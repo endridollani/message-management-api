@@ -38,6 +38,7 @@
     "class-validator": "^0.15.1",
     "express": "^5.2.1",
     "joi": "^18.2.3",
+    "kafkajs": "^2.2.4",
     "mongoose": "^9.7.3",
     "nestjs-pino": "^4.6.1",
     "pino-http": "^11.0.0",

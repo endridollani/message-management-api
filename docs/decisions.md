@@ -147,3 +147,31 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Reason: P3 intentionally keeps search behavior out of scope and should not create an unused ES client solely for readiness.
 - Trade-off: P3 readiness is not the final all-dependencies production policy.
 - Alternatives: keep the P2B placeholder; add an ad hoc Elasticsearch probe before search exists.
+
+### 19. Keep KafkaJS producer idempotence disabled in P4A
+
+- Context: P4A adds the messaging library and outbox publisher. The plan allows
+  KafkaJS producer idempotence only if it is stable and documented enough to rely
+  on operationally.
+- Decision: configure the KafkaJS producer with `acks: -1` on sends and
+  `allowAutoTopicCreation: false`, but do not enable `idempotent`.
+- Reason: correctness already comes from the transactional outbox, lock-owner-safe
+  row transitions, at-least-once delivery, and downstream idempotency; adding an
+  idempotent producer is not required for this slice and should not become a
+  hidden correctness dependency.
+- Trade-off: a crash after Kafka ack and before marking the row published can
+  duplicate a publish, which is the accepted at-least-once behavior.
+- Alternatives: enable KafkaJS idempotence immediately; use Kafka transactions.
+
+### 20. Use direct MongoDB connections for host-run local runtimes
+
+- Context: local Compose initializes the MongoDB replica set with member host
+  `mongodb:27017`, but host-run Nest runtimes connect through `localhost:27017`.
+- Decision: document the local host-run `MONGODB_URI` with
+  `replicaSet=rs0&directConnection=true`.
+- Reason: it preserves transaction-capable replica-set behavior while avoiding
+  host DNS discovery of the container-only `mongodb` hostname.
+- Trade-off: Compose-managed application containers should use an internal
+  container-network URI instead of the host-run example.
+- Alternatives: advertise the replica-set member as `localhost`; require a host
+  alias for `mongodb`; run all application processes inside Compose.

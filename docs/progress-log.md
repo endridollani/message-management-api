@@ -97,3 +97,38 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   Elasticsearch when P4 implements search.
 - Next action: proceed to P4 only when requested: messaging lib, outbox publisher, ES
   search/indexer path.
+
+## 2026-07-03 - P4A: Messaging lib and outbox publisher
+
+- Scope: implemented the KafkaJS messaging library and outbox-publisher runtime
+  only. The messaging lib initializes `messages.message-created.v1` and
+  `messages.message-created.v1.dlq`, exposes Kafka readiness, and provides a JSON
+  producer using `acks: -1` without relying on KafkaJS idempotent producer
+  correctness. The publisher claims due pending events, reclaims expired
+  publishing leases, publishes outbox `topic`/`key`/`payload`, marks published
+  with a lock-owner-safe filter, retries with exponential backoff + jitter, and
+  marks max-attempt rows terminal `failed`. Elasticsearch, search-indexer, search
+  endpoint behavior, and CLI commands remain out of scope.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `.env.example`,
+  `apps/outbox-publisher/src/`, `libs/domain/src/`, `libs/messaging/src/`,
+  `libs/observability/src/`, `libs/persistence/src/`, and docs.
+- Validation:
+  - `pnpm add -w kafkajs` - passed using pnpm 11.1.1.
+  - `pnpm run typecheck` - initially failed for strict test mock casts; final
+    rerun passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 14 test suites and 33 tests passed.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run lint` - initially failed for new-test unbound-method assertions and
+    an unused parameter; final rerun passed using pnpm 11.1.1.
+  - `docker compose up -d mongodb mongodb-init kafka` - passed; MongoDB and Kafka
+    were healthy.
+  - Manual publish verification - passed: a pending outbox row was published by
+    the worker, marked `published` in MongoDB, and observed on
+    `messages.message-created.v1`.
+- Open issues: no CLI redrive exists yet, so failed-row redrive remains a manual
+  operator action until the CLI slice. KafkaJS emits a Node
+  `TimeoutNegativeWarning` in this local runtime, but publish/readiness behavior
+  is healthy.
+- Next action: proceed to the next requested P4 slice only when requested:
+  Elasticsearch search lib, search-indexer, search endpoint behavior, DLQ/redrive,
+  or CLI commands.

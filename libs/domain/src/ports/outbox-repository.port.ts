@@ -35,6 +35,47 @@ export type CreateOutboxEventInput = {
   createdAt: Date;
 };
 
+export type ClaimPublishableOutboxEventsInput = {
+  batchSize: number;
+  lockedBy: string;
+  lockTimeoutMs: number;
+  now: Date;
+};
+
+export type MarkPublishedOutboxEventInput = {
+  id: string;
+  lockedBy: string;
+  publishedAt: Date;
+};
+
+export type ScheduleOutboxRetryInput = {
+  id: string;
+  lockedBy: string;
+  attempts: number;
+  nextAttemptAt: Date;
+  lastError: string;
+};
+
+export type MarkFailedOutboxEventInput = {
+  id: string;
+  lockedBy: string;
+  attempts: number;
+  failedAt: Date;
+  lastError: string;
+};
+
+export type OutboxPendingStats = {
+  pendingCount: number;
+  oldestPendingCreatedAt?: Date;
+};
+
 export interface OutboxRepositoryPort {
   create(input: CreateOutboxEventInput, session: ClientSession): Promise<OutboxEvent>;
+  claimPublishable(
+    input: ClaimPublishableOutboxEventsInput,
+  ): Promise<readonly OutboxEvent[]>;
+  markPublished(input: MarkPublishedOutboxEventInput): Promise<boolean>;
+  scheduleRetry(input: ScheduleOutboxRetryInput): Promise<boolean>;
+  markFailed(input: MarkFailedOutboxEventInput): Promise<boolean>;
+  getPendingStats(now: Date): Promise<OutboxPendingStats>;
 }
