@@ -17,13 +17,13 @@ export default tseslint.config(
         ...globals.node,
       },
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.spec.json'],
+        project: ['./tsconfig.src.json', './tsconfig.spec.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-unsafe-assignment': 'off'
+      '@typescript-eslint/no-unsafe-assignment': 'off',
     },
   },
   {

@@ -469,3 +469,29 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   fails locally under Node 26, so validation used the cached pnpm 11.1.1 binary
   directly. No follow-up remains for the Claude review findings.
 - Next action: hand back for review.
+
+## 2026-07-03 - VS Code TypeScript test project detection
+
+- Scope: made the root TypeScript config a solution-style entry point so VS Code
+  loads the source and spec projects separately. Added `tsconfig.src.json` for
+  production source typechecking, kept Jest globals isolated to
+  `tsconfig.spec.json`, updated ESLint typed parsing and the `typecheck` script,
+  and added a workspace-relative VS Code TypeScript SDK setting.
+- Files touched: `.vscode/settings.json`, `tsconfig.json`,
+  `tsconfig.src.json`, `tsconfig.spec.json`, `eslint.config.mjs`,
+  `package.json`, and `docs/progress-log.md`.
+- Verification: `tsc --showConfig -p tsconfig.src.json` keeps production types
+  to `node`; `tsc --showConfig -p tsconfig.spec.json` includes `node` and
+  `jest` with the shared `@app/*` path aliases. A `tsserver` project-info probe
+  resolved the requested representative spec files to `tsconfig.spec.json`.
+- Validation, using the cached pnpm 11.1.1 executable directly:
+  - `pnpm run typecheck` - passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run test:unit` - passed; 16 suites and 52 tests.
+  - `pnpm run test:e2e` - passed; 4 suites and 15 tests.
+  - `pnpm run test:integration` - passed; 1 suite and 10 tests, with the known
+    local KafkaJS warning/coordinator noise.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration all green, with the
+    same known KafkaJS warning/coordinator noise.
+  - `pnpm run build` - passed.
+- Open issues: none.

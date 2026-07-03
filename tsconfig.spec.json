@@ -1,10 +1,18 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "declaration": false,
+    "composite": true,
     "noEmit": true,
+    "tsBuildInfoFile": "./dist/tsconfig.spec.tsbuildinfo",
     "types": ["node", "jest"]
   },
-  "include": ["apps/**/*.spec.ts", "libs/**/*.spec.ts", "test/**/*.ts"],
+  "include": [
+    "apps/**/*.ts",
+    "libs/**/*.ts",
+    "apps/**/*.spec.ts",
+    "libs/**/*.spec.ts",
+    "test/**/*.ts",
+    "test/*.spec.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }
