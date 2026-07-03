@@ -272,6 +272,55 @@ describe('Messages API contract', () => {
   });
 });
 
+describe('API behavior during Elasticsearch outage', () => {
+  let harness: ApiTestHarness;
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    harness = await createApiTestHarness({
+      elasticsearchNode: 'http://127.0.0.1:1',
+      elasticsearchReadiness: 'down',
+      useActualIndexManager: true,
+    });
+    app = harness.app;
+    harness.searchPort.searchMessages.mockRejectedValue(new SearchUnavailableError());
+  }, 60_000);
+
+  afterAll(async () => {
+    await harness.close();
+  });
+
+  it('boots, marks readiness down, keeps create/list available, and returns 503 for search', async () => {
+    const readiness = await request(httpServer(app)).get('/health/readiness').expect(503);
+
+    expect(readiness.body).toMatchObject({
+      error: {
+        elasticsearch: {
+          status: 'down',
+          alias: 'messages-read',
+        },
+      },
+    });
+
+    await createMessage(app, 'mongo still works');
+
+    const list = await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages')
+      .set('x-api-key', VALID_API_KEY)
+      .expect(200);
+
+    expect((list.body as ListBody).data.map((message) => message.content)).toEqual([
+      'mongo still works',
+    ]);
+
+    await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages/search')
+      .query({ q: 'mongo' })
+      .set('x-api-key', VALID_API_KEY)
+      .expect(503);
+  });
+});
+
 async function createMessage(app: INestApplication, content: string): Promise<void> {
   await request(httpServer(app))
     .post('/api/messages')

@@ -41,6 +41,11 @@ pnpm run start:cli -- dlq:redrive --dry-run --limit 10
 pnpm run start:cli -- es:reindex --dry-run
 ```
 
+CLI bootstrap does not require all infrastructure env vars. Each command still
+requires the env vars for the systems it touches: outbox commands need
+`MONGODB_URI`, DLQ redrive needs `KAFKA_BROKERS`, and ES reindex needs
+`ELASTICSEARCH_NODE`.
+
 Use distinct `PORT`, `OUTBOX_HEALTH_PORT`, and `INDEXER_HEALTH_PORT` values when
 running multiple host processes in parallel.
 

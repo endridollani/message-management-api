@@ -15,7 +15,9 @@ writes only through `messages-write`. Physical indices are versioned, such as
 
 `IndexManagerService` creates `messages-v1` and missing aliases on startup, but
 it does not move existing aliases. Operator-controlled alias swaps are therefore
-preserved across runtime restarts.
+preserved across runtime restarts. API startup logs a warning and continues if
+this bootstrap cannot reach Elasticsearch; search-indexer startup still fails so
+operators do not run the indexing worker without explicit index/alias bootstrap.
 
 ## Verify Bootstrap
 

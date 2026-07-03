@@ -8,6 +8,7 @@ import type { MessageSearchPort } from '@app/domain';
 import { CorrelationIdContext } from '@app/observability';
 import { ElasticsearchHealthIndicator, IndexManagerService } from '@app/search';
 import { json } from 'express';
+import { HealthCheckError } from '@nestjs/terminus';
 import { Connection } from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createHash } from 'node:crypto';
@@ -27,7 +28,16 @@ export type ApiTestHarness = {
   close: () => Promise<void>;
 };
 
-export async function createApiTestHarness(): Promise<ApiTestHarness> {
+type ApiTestHarnessOptions = {
+  elasticsearchNode?: string;
+  elasticsearchReadiness?: 'up' | 'down' | 'actual';
+  useActualElasticsearchHealthIndicator?: boolean;
+  useActualIndexManager?: boolean;
+};
+
+export async function createApiTestHarness(
+  options: ApiTestHarnessOptions = {},
+): Promise<ApiTestHarness> {
   const replSet = await MongoMemoryReplSet.create({
     replSet: {
       count: 1,
@@ -38,7 +48,7 @@ export async function createApiTestHarness(): Promise<ApiTestHarness> {
   process.env = {
     ...process.env,
     API_KEYS: `local:${API_KEY_HASH}`,
-    ELASTICSEARCH_NODE: 'http://localhost:9200',
+    ELASTICSEARCH_NODE: options.elasticsearchNode ?? 'http://localhost:9200',
     LOG_LEVEL: 'silent',
     MONGODB_URI: replSet.getUri('message_management'),
     NODE_ENV: 'test',
@@ -58,26 +68,46 @@ export async function createApiTestHarness(): Promise<ApiTestHarness> {
       },
     }),
   };
-  const moduleRef = await Test.createTestingModule({
+  let moduleBuilder = Test.createTestingModule({
     imports: [ApiModule],
   })
     .overrideProvider(MESSAGE_SEARCH)
-    .useValue(searchPort)
-    .overrideProvider(IndexManagerService)
-    .useValue({
+    .useValue(searchPort);
+
+  if (options.useActualIndexManager !== true) {
+    moduleBuilder = moduleBuilder.overrideProvider(IndexManagerService).useValue({
       ensureMessagesIndex: jest.fn(),
       onModuleInit: jest.fn(),
-    })
-    .overrideProvider(ElasticsearchHealthIndicator)
-    .useValue({
+    });
+  }
+
+  if (options.elasticsearchReadiness === 'down') {
+    moduleBuilder = moduleBuilder.overrideProvider(ElasticsearchHealthIndicator).useValue({
+      isReadReady: jest.fn().mockRejectedValue(
+        new HealthCheckError('Elasticsearch is not ready', {
+          elasticsearch: {
+            alias: 'messages-read',
+            error: 'connect ECONNREFUSED',
+            status: 'down',
+          },
+        }),
+      ),
+    });
+  } else if (
+    options.useActualElasticsearchHealthIndicator !== true &&
+    options.elasticsearchReadiness !== 'actual'
+  ) {
+    moduleBuilder = moduleBuilder.overrideProvider(ElasticsearchHealthIndicator).useValue({
       isReadReady: jest.fn().mockReturnValue({
         elasticsearch: {
           alias: 'messages-read',
           status: 'up',
         },
       }),
-    })
-    .compile();
+    });
+  }
+
+  const moduleRef = await moduleBuilder.compile();
   const app = moduleRef.createNestApplication({
     bodyParser: false,
     bufferLogs: true,

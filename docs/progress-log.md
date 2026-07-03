@@ -436,3 +436,36 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   pnpm shim mismatch, KafkaJS local warning noise, and Docker disk pressure.
 - Next action: run the remote CI workflow on the PR branch if this is being
   reviewed through GitHub.
+
+## 2026-07-03 - Addressed Claude review operability comments
+
+- Scope: addressed Claude review operability comments. Made API Elasticsearch
+  index bootstrap non-fatal while keeping readiness/search failure visible;
+  added KafkaJS consumer CRASH/STOP runner state to search-indexer readiness;
+  corrected `start:prod` to the emitted API path; made CLI bootstrap validation
+  command-scoped for infrastructure env vars; softened per-conversation ordering
+  wording to partition affinity across docs.
+- Files touched: API/search-indexer/search/config/CLI tests and runtime files,
+  `package.json`, `test/e2e`, Jest unit config, README, observability,
+  decisions, handoff, progress log, and runbooks.
+- Validation, using the cached pnpm 11.1.1 executable directly:
+  - `pnpm run typecheck` - passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run test:unit` - passed; 16 suites and 52 tests.
+  - `pnpm run test:e2e` - passed; 4 suites and 15 tests.
+  - `pnpm run test:integration` - passed; 1 suite and 10 tests, with the known
+    local KafkaJS warning/coordinator noise.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration all green, with the
+    same known KafkaJS warning/coordinator noise.
+  - `pnpm run build` - passed.
+  - `docker compose config` - passed.
+  - `docker build --target api -t message-management-api:api .` - passed.
+  - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
+- Runtime smoke: with MongoDB healthy and Elasticsearch stopped, the built API
+  booted on port `3310`, liveness returned 200, readiness returned 503 with
+  Elasticsearch down, create/list worked against MongoDB, and search returned
+  503. Elasticsearch was restarted afterward.
+- Open issues: ambient `pnpm` still reports 11.7.0 and `corepack pnpm` currently
+  fails locally under Node 26, so validation used the cached pnpm 11.1.1 binary
+  directly. No follow-up remains for the Claude review findings.
+- Next action: hand back for review.

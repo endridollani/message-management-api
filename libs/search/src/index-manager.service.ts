@@ -1,5 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
+
+import type { MessageManagementRuntime } from '@app/config';
 
 import {
   MESSAGES_PHYSICAL_INDEX,
@@ -12,10 +15,29 @@ import { messagesV1IndexDefinition } from './mappings/messages-v1.mapping';
 export class IndexManagerService implements OnModuleInit {
   private readonly logger = new Logger(IndexManagerService.name);
 
-  constructor(private readonly elasticsearch: ElasticsearchService) {}
+  constructor(
+    private readonly elasticsearch: ElasticsearchService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.ensureMessagesIndex();
+    try {
+      await this.ensureMessagesIndex();
+    } catch (error) {
+      if (this.configService.get<MessageManagementRuntime>('app.runtime') !== 'api') {
+        throw error;
+      }
+
+      this.logger.warn(
+        {
+          aliases: [MESSAGES_READ_ALIAS, MESSAGES_WRITE_ALIAS],
+          error: error instanceof Error ? error.message : String(error),
+          index: MESSAGES_PHYSICAL_INDEX,
+          runtime: 'api',
+        },
+        'Elasticsearch index bootstrap failed; API startup will continue with search readiness down',
+      );
+    }
   }
 
   async ensureMessagesIndex(): Promise<void> {

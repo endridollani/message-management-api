@@ -11,7 +11,7 @@ describe('IndexManagerService', () => {
     const elasticsearch = mockElasticsearch({
       exists: jest.fn().mockResolvedValue(false),
     });
-    const service = new IndexManagerService(elasticsearch as never);
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('search-indexer'));
 
     await service.ensureMessagesIndex();
 
@@ -44,7 +44,7 @@ describe('IndexManagerService', () => {
     const elasticsearch = mockElasticsearch({
       exists: jest.fn().mockResolvedValue(true),
     });
-    const service = new IndexManagerService(elasticsearch as never);
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('search-indexer'));
 
     await service.ensureMessagesIndex();
 
@@ -57,7 +57,7 @@ describe('IndexManagerService', () => {
       exists: jest.fn().mockResolvedValue(true),
       existsAlias: jest.fn().mockResolvedValue(true),
     });
-    const service = new IndexManagerService(elasticsearch as never);
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('search-indexer'));
 
     await service.ensureMessagesIndex();
 
@@ -79,12 +79,36 @@ describe('IndexManagerService', () => {
       }),
       exists: jest.fn().mockResolvedValue(false),
     });
-    const service = new IndexManagerService(elasticsearch as never);
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('search-indexer'));
 
     await expect(service.ensureMessagesIndex()).resolves.toBeUndefined();
     expect(elasticsearch.indices.updateAliases).toHaveBeenCalledTimes(1);
   });
+
+  it('does not fail API startup when Elasticsearch bootstrap fails', async () => {
+    const elasticsearch = mockElasticsearch({
+      exists: jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED')),
+    });
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('api'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+  });
+
+  it('fails worker startup when Elasticsearch bootstrap fails', async () => {
+    const elasticsearch = mockElasticsearch({
+      exists: jest.fn().mockRejectedValue(new Error('connect ECONNREFUSED')),
+    });
+    const service = new IndexManagerService(elasticsearch as never, mockConfig('search-indexer'));
+
+    await expect(service.onModuleInit()).rejects.toThrow('connect ECONNREFUSED');
+  });
 });
+
+function mockConfig(runtime: string) {
+  return {
+    get: jest.fn((key: string) => (key === 'app.runtime' ? runtime : undefined)),
+  } as never;
+}
 
 function mockElasticsearch(overrides: {
   create?: jest.Mock;

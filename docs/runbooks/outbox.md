@@ -168,8 +168,8 @@ fields. It never touches `published` rows.
 
 ## Scale-Out
 
-The default deployment remains one publisher replica. Kafka keying preserves
-per-conversation order once messages reach Kafka, but multiple uncoordinated
-publisher replicas can race and increase duplicate publishes. If throughput
-requires scale-out, use explicit key-hash sharding so each outbox row is
-claimable by exactly one shard.
+The default deployment remains one publisher replica. Kafka keying gives
+per-conversation partition affinity. Strict per-conversation ordering is not
+guaranteed across publish retries, and multiple uncoordinated publisher replicas
+can race and increase duplicate publishes. If throughput requires scale-out, use
+explicit key-hash sharding so each outbox row is claimable by exactly one shard.

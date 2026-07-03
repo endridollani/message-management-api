@@ -7,5 +7,5 @@ module.exports = {
     '<rootDir>/apps/api/src/api.module.spec.ts',
     '<rootDir>/apps/api/src/health/health.controller.spec.ts',
   ],
-  testMatch: ['<rootDir>/{apps,libs}/**/*.spec.ts'],
+  testMatch: ['<rootDir>/{apps,libs}/**/*.spec.ts', '<rootDir>/test/*.spec.ts'],
 };

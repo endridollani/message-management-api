@@ -65,13 +65,13 @@ function numberFromEnv(name: string, defaultValue: number): number {
   return value === undefined ? defaultValue : Number(value);
 }
 
-function parseCsv(value: string | undefined): string[] {
-  return value
-    ? value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-    : [];
+function parseCsv(value: string | undefined): string[] | undefined {
+  const entries = value
+    ?.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return entries && entries.length > 0 ? entries : undefined;
 }
 
 function parseApiKeys(value: string | undefined): Array<{ name: string; hash: string }> {

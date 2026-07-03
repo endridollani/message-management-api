@@ -274,15 +274,17 @@ test/
   production should use a real replica set.
 - Kafka production deployments should use multiple brokers, replication, and
   appropriate `min.insync.replicas`. The producer sends with `acks: -1`.
-- The default publisher model is one active publisher replica. Scale-out needs
-  explicit key-hash sharding to preserve claim ownership and per-conversation
-  ordering expectations.
+- The default publisher model is one active publisher replica. Kafka keying
+  gives per-conversation partition affinity. Strict per-conversation ordering is
+  not guaranteed across publish retries. Scale-out needs explicit key-hash
+  sharding to preserve claim ownership.
 - Elasticsearch runs unsecured locally. Production must enable security, TLS,
   credentials, backup/restore, and index lifecycle policies appropriate to the
   deployment.
 - API readiness includes Elasticsearch because the deployed API contract includes
-  search. If create/list should stay routable during ES outages, split readiness
-  policy at the deployment layer.
+  search. During an Elasticsearch outage, the API process still boots and
+  create/list remain available when MongoDB is healthy, but readiness reports
+  Elasticsearch down and search returns `503`.
 - `senderId` is trusted only for API-key-authenticated internal services. Public
   user-facing deployments must derive sender identity from an authenticated
   principal, such as a JWT `sub`.

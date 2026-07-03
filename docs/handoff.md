@@ -35,6 +35,16 @@ search smoke hit the known local Elasticsearch flood-stage
 remediation was applied and the transient cluster setting was restored after the
 indexed search hit passed.
 
+Post-review operability cleanup addressed the approved minor Claude review
+comments. API Elasticsearch index bootstrap is now non-fatal only for the API
+runtime, while readiness still reports Elasticsearch down and search returns
+`503`. Search-indexer readiness now includes KafkaJS consumer runner state from
+CRASH/STOP instrumentation. CLI bootstrap no longer requires all MongoDB, Kafka,
+and Elasticsearch env vars up front; selected commands still fail when their own
+required env vars are missing. `start:prod` now points at the emitted API path
+used by Docker, and ordering docs now describe per-conversation partition
+affinity rather than strict ordering across retries.
+
 ## How To Run Locally
 
 Prepare pnpm and dependencies:
@@ -113,9 +123,13 @@ docker build --target cli -t message-management-api:cli .
 pnpm audit --prod --audit-level high
 ```
 
-P8 ran all commands above successfully with pnpm 11.1.1. The integration suite
-and DLQ dry-run emitted the known local KafkaJS `TimeoutNegativeWarning` and
-transient single-node coordinator logs, but all assertions and commands passed.
+Latest post-review validation used the cached pnpm 11.1.1 executable directly
+because the ambient `pnpm` shim reports 11.7.0 and `corepack pnpm` fails under
+the local Node 26/Corepack combination. `typecheck`, `lint`, `test:unit`,
+`test:e2e`, `test:integration`, `test:ci`, `build`, `docker compose config`,
+and Docker builds for the `api` and `search-indexer` targets passed. The
+integration suite emitted the known local KafkaJS `TimeoutNegativeWarning` and
+transient single-node coordinator logs, but all assertions passed.
 
 ## Runtime Smoke Result
 
@@ -137,12 +151,19 @@ Verified:
   while the indexer was stopped was indexed and searchable after restart.
 - CLI dry-runs passed for `outbox:inspect`, `outbox:redrive --dry-run`,
   `dlq:redrive --dry-run`, and `es:reindex --dry-run`.
+- Elasticsearch-unavailable API smoke passed: with MongoDB healthy and
+  Elasticsearch stopped, the built API booted on port `3310`, liveness returned
+  200, readiness returned 503 with Elasticsearch down, `POST /api/messages`
+  returned 201, list returned the created message from MongoDB, and search
+  returned 503.
 
 ## Known Local Caveats
 
-- The ambient `pnpm` shim on this machine still reports `11.7.0` after Corepack
-  prepares `11.1.1`. P8 validation used the pinned pnpm 11.1.1 executable
-  directly. Use Corepack/pnpm 11.1.1 in normal environments.
+- The ambient `pnpm` shim on this machine still reports `11.7.0`. `corepack pnpm`
+  currently fails locally under Node 26 with
+  `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`, so post-review validation used the
+  cached pnpm 11.1.1 executable directly. Use Corepack/pnpm 11.1.1 in normal
+  environments.
 - Local KafkaJS may emit `TimeoutNegativeWarning` and transient coordinator logs
   with the single-node broker. Treat this as non-blocking when readiness is
   green and commands complete.

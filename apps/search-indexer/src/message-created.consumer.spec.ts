@@ -50,12 +50,7 @@ describe('MessageCreatedConsumer', () => {
   });
 
   it('subscribes from the beginning for partitions without committed offsets', async () => {
-    const kafkaConsumer = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-      run: jest.fn().mockResolvedValue(undefined),
-      subscribe: jest.fn().mockResolvedValue(undefined),
-    };
+    const kafkaConsumer = mockKafkaConsumer();
     const kafka = {
       consumer: jest.fn().mockReturnValue(kafkaConsumer),
     };
@@ -67,6 +62,9 @@ describe('MessageCreatedConsumer', () => {
     );
 
     await consumer.onModuleInit();
+
+    expect(consumer.isRunning()).toBe(true);
+
     await consumer.onApplicationShutdown();
 
     expect(kafkaConsumer.subscribe.mock.calls).toEqual([
@@ -77,6 +75,43 @@ describe('MessageCreatedConsumer', () => {
         },
       ],
     ]);
+    expect(consumer.isRunning()).toBe(false);
+  });
+
+  it('keeps readiness healthy for restartable consumer crashes', async () => {
+    const kafkaConsumer = mockKafkaConsumer();
+    const kafka = {
+      consumer: jest.fn().mockReturnValue(kafkaConsumer),
+    };
+    consumer = new MessageCreatedConsumer(
+      kafka as never,
+      search,
+      producer as unknown as KafkaProducerService,
+      metrics as unknown as MetricsService,
+    );
+
+    await consumer.onModuleInit();
+    kafkaConsumer.emitCrash({ restart: true });
+
+    expect(consumer.isRunning()).toBe(true);
+  });
+
+  it('marks readiness unhealthy when a non-restartable consumer crash stops the runner', async () => {
+    const kafkaConsumer = mockKafkaConsumer();
+    const kafka = {
+      consumer: jest.fn().mockReturnValue(kafkaConsumer),
+    };
+    consumer = new MessageCreatedConsumer(
+      kafka as never,
+      search,
+      producer as unknown as KafkaProducerService,
+      metrics as unknown as MetricsService,
+    );
+
+    await consumer.onModuleInit();
+    kafkaConsumer.emitCrash({ restart: false });
+
+    expect(consumer.isRunning()).toBe(false);
   });
 
   it('indexes valid message-created events with only mapped fields', async () => {
@@ -285,6 +320,37 @@ function buildPayload(value: Buffer, offset = '42'): EachMessagePayload {
       value,
     },
   };
+}
+
+function mockKafkaConsumer() {
+  const listeners = new Map<string, Array<(event: never) => void>>();
+  const consumer = {
+    connect: jest.fn().mockResolvedValue(undefined),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    events: {
+      CRASH: 'consumer.crash',
+      STOP: 'consumer.stop',
+    },
+    on: jest.fn((eventName: string, listener: (event: never) => void) => {
+      listeners.set(eventName, [...(listeners.get(eventName) ?? []), listener]);
+      return jest.fn();
+    }),
+    run: jest.fn().mockResolvedValue(undefined),
+    subscribe: jest.fn().mockResolvedValue(undefined),
+    emitCrash(input: { restart: boolean }) {
+      for (const listener of listeners.get('consumer.crash') ?? []) {
+        listener({
+          payload: {
+            error: new Error('consumer crashed'),
+            groupId: 'message-management-api.search-indexer',
+            restart: input.restart,
+          },
+        } as never);
+      }
+    },
+  };
+
+  return consumer;
 }
 
 function elasticsearchError(statusCode: number): Error {

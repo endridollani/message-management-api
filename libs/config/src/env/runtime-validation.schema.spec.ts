@@ -45,4 +45,27 @@ describe('createRuntimeValidationSchema', () => {
 
     expect(result.error).toBeUndefined();
   });
+
+  it('does not require command-specific infrastructure config at CLI bootstrap', () => {
+    const result = createRuntimeValidationSchema('cli').validate(
+      {
+        NODE_ENV: 'test',
+      },
+      { allowUnknown: true },
+    );
+
+    expect(result.error).toBeUndefined();
+  });
+
+  it('still validates CLI infrastructure config when provided', () => {
+    const result = createRuntimeValidationSchema('cli').validate(
+      {
+        KAFKA_BROKERS: 'not-a-broker',
+        NODE_ENV: 'test',
+      },
+      { allowUnknown: true },
+    );
+
+    expect(result.error?.message).toContain('KAFKA_BROKERS');
+  });
 });

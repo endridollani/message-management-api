@@ -11,11 +11,19 @@ All operational routes are outside the API global prefix.
 | --- | ---: | --- | --- | --- |
 | `api` | `PORT`, default `3000` | `/health/liveness` | `/health/readiness` checks runtime, MongoDB, and Elasticsearch `messages-read` alias | `/metrics` |
 | `outbox-publisher` | `OUTBOX_HEALTH_PORT`, default `3001` | `/health/liveness` | `/health/readiness` checks runtime, MongoDB, and Kafka metadata for `messages.message-created.v1` | `/metrics` |
-| `search-indexer` | `INDEXER_HEALTH_PORT`, default `3002` | `/health/liveness` | `/health/readiness` checks runtime, Kafka metadata for `messages.message-created.v1`, and Elasticsearch `messages-write` alias | `/metrics` |
+| `search-indexer` | `INDEXER_HEALTH_PORT`, default `3002` | `/health/liveness` | `/health/readiness` checks runtime, Kafka metadata for `messages.message-created.v1`, Elasticsearch `messages-write` alias, and the message-created consumer runner | `/metrics` |
 
 API readiness includes Elasticsearch because the deployed API contract includes
 search. During an Elasticsearch outage, create/list can still work against
-MongoDB, but the API is not ready under the default policy.
+MongoDB, but the API is not ready under the default policy. Elasticsearch index
+bootstrap failure is non-fatal for the API runtime; operators should expect a
+startup warning, readiness down for Elasticsearch, and `503` from the search
+endpoint until Elasticsearch recovers.
+
+Search-indexer readiness includes the KafkaJS consumer runner state. Restartable
+KafkaJS consumer crashes keep normal KafkaJS restart behavior; a non-restartable
+crash that stops the runner marks readiness down even if Kafka metadata and
+Elasticsearch are otherwise reachable.
 
 Health responses use Nest Terminus shape: top-level `status`, `info`, `error`,
 and `details`. Runtime indicators include the runtime name; readiness indicators
@@ -86,7 +94,7 @@ Search-indexer metrics:
   `message_management_outbox_oldest_pending_age_seconds`.
 - Any sustained increase in `message_management_outbox_events_failed_total`.
 - Any increase in `message_management_search_indexer_messages_dlq_total`.
-- Search-indexer readiness failure or Kafka consumer lag for
+- Search-indexer readiness failure, stopped consumer runner, or Kafka consumer lag for
   `message-management-api.search-indexer`.
 
 Consumer lag is not emitted as an app metric yet. Inspect locally with:

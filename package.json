@@ -17,7 +17,7 @@
     "start": "nest start api",
     "start:dev": "nest start api --watch",
     "start:debug": "nest start api --debug --watch",
-    "start:prod": "node dist/apps/api/main.js",
+    "start:prod": "node dist/apps/api/apps/api/src/main.js",
     "start:outbox-publisher": "nest start outbox-publisher",
     "start:search-indexer": "nest start search-indexer",
     "start:cli": "nest start cli",

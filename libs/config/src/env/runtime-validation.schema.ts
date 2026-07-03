@@ -68,6 +68,16 @@ const indexerSchema = {
   INDEXER_HEALTH_PORT: Joi.number().port().default(3002),
 };
 
+const cliSchema = {
+  ...baseSchema,
+  MONGODB_URI: mongoSchema.MONGODB_URI.optional(),
+  KAFKA_BROKERS: kafkaSchema.KAFKA_BROKERS.optional(),
+  KAFKA_CLIENT_ID: kafkaSchema.KAFKA_CLIENT_ID,
+  ELASTICSEARCH_NODE: elasticsearchSchema.ELASTICSEARCH_NODE.optional(),
+  ...outboxTuningSchema,
+  ...indexerSchema,
+};
+
 export function createRuntimeValidationSchema(runtime: MessageManagementRuntime): Joi.ObjectSchema {
   const schemaByRuntime: Record<MessageManagementRuntime, Joi.SchemaMap> = {
     api: {
@@ -86,14 +96,7 @@ export function createRuntimeValidationSchema(runtime: MessageManagementRuntime)
       ...elasticsearchSchema,
       ...indexerSchema,
     },
-    cli: {
-      ...baseSchema,
-      ...mongoSchema,
-      ...kafkaSchema,
-      ...elasticsearchSchema,
-      ...outboxTuningSchema,
-      ...indexerSchema,
-    },
+    cli: cliSchema,
   };
 
   return Joi.object(schemaByRuntime[runtime]);

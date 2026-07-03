@@ -34,6 +34,7 @@ type ParsedEvent =
 export class MessageCreatedConsumer implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(MessageCreatedConsumer.name);
   private consumer?: Consumer;
+  private running = false;
 
   constructor(
     @Inject(KAFKA_CLIENT) private readonly kafka: Kafka,
@@ -47,11 +48,31 @@ export class MessageCreatedConsumer implements OnModuleInit, OnApplicationShutdo
       groupId: MESSAGE_CREATED_SEARCH_INDEXER_GROUP,
     });
 
+    this.consumer.on(this.consumer.events.CRASH, (event) => {
+      if (!event.payload.restart) {
+        this.running = false;
+      }
+
+      this.logger.error(
+        {
+          error: event.payload.error.message,
+          groupId: event.payload.groupId,
+          restart: event.payload.restart,
+        },
+        'Search indexer consumer crashed',
+      );
+    });
+
+    this.consumer.on(this.consumer.events.STOP, () => {
+      this.running = false;
+    });
+
     await this.consumer.connect();
     await this.consumer.subscribe({
       fromBeginning: true,
       topic: MESSAGE_CREATED_TOPIC,
     });
+    this.running = true;
     void this.consumer
       .run({
         eachMessage: async (payload) => {
@@ -59,6 +80,7 @@ export class MessageCreatedConsumer implements OnModuleInit, OnApplicationShutdo
         },
       })
       .catch((error: unknown) => {
+        this.running = false;
         this.logger.error(
           {
             error: error instanceof Error ? error.message : String(error),
@@ -73,7 +95,12 @@ export class MessageCreatedConsumer implements OnModuleInit, OnApplicationShutdo
       return;
     }
 
+    this.running = false;
     await this.consumer.disconnect();
+  }
+
+  isRunning(): boolean {
+    return this.running;
   }
 
   async handleMessage(payload: EachMessagePayload): Promise<void> {

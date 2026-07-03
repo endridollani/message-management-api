@@ -24,7 +24,7 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 
 - Context: event order matters per conversation.
 - Decision: run one publisher replica in the default deployment.
-- Reason: simple deterministic dispatch; Kafka keying preserves per-conversation order downstream.
+- Reason: simple deterministic dispatch; Kafka keying gives per-conversation partition affinity downstream.
 - Trade-off: publisher throughput ceiling.
 - Alternatives: key-hash sharded publishers once scale requires it.
 
@@ -222,12 +222,15 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Context: Importing worker modules into the CLI would connect Kafka producers
   and initialize Elasticsearch aliases even for Mongo-only commands.
 - Decision: CLI services construct MongoDB, Kafka, and Elasticsearch clients only
-  inside the commands that need them.
+  inside the commands that need them. CLI bootstrap validation does not require
+  MongoDB, Kafka, or Elasticsearch env vars unless the selected command reads
+  them through command-scoped config.
 - Reason: `outbox:inspect` should not require Kafka producer startup or touch
   Elasticsearch aliases, and `es:reindex --dry-run` should not initialize worker
   side effects.
 - Trade-off: the CLI has small operational client wrappers instead of only using
-  Nest module providers.
+  Nest module providers, and missing command-specific env vars fail when the
+  selected command first needs them rather than at CLI bootstrap.
 - Alternatives: import `PersistenceModule`, `MessagingModule`, and `SearchModule`
   globally into `CliModule`.
 
@@ -257,6 +260,22 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Trade-off: CI and merge gates must call the explicit integration command.
 - Alternatives: run all suites through one Jest regex; make integration part of
   every local `test` invocation.
+
+### 27. Make API Elasticsearch index bootstrap non-fatal
+
+- Context: `ApiModule` imports `SearchModule`, whose index manager creates the
+  physical index and aliases at module init. When Elasticsearch is unavailable,
+  that startup work must not prevent Mongo-backed create/list endpoints from
+  serving.
+- Decision: `IndexManagerService` logs and suppresses index-bootstrap failures
+  only for the `api` runtime. Worker runtimes still fail startup when their
+  required Elasticsearch bootstrap cannot complete.
+- Reason: preserves partial API availability during Elasticsearch outages while
+  keeping readiness honest and keeping search-indexer startup explicit.
+- Trade-off: API instances can start with search unavailable and rely on
+  readiness/search `503` signals until Elasticsearch recovers.
+- Alternatives: split API search wiring into a separate runtime/module; move all
+  index initialization to deploy-time migrations only.
 
 ### 27. Use @nestjs/swagger for API-only OpenAPI documentation
 
