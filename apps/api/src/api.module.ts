@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MessageManagementConfigModule } from '@app/config';
 import { ObservabilityModule } from '@app/observability';
 import { PersistenceModule } from '@app/persistence';
+import { SearchModule } from '@app/search';
 
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health/health.controller';
@@ -15,6 +16,7 @@ import { MetricsController } from './metrics/metrics.controller';
     ObservabilityModule,
     AuthModule,
     PersistenceModule,
+    SearchModule,
     MessagesModule,
   ],
 })

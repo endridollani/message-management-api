@@ -27,7 +27,7 @@ describe('Health and metrics controllers', () => {
     });
   });
 
-  it('reports runtime and MongoDB readiness', async () => {
+  it('reports runtime, MongoDB, and Elasticsearch readiness', async () => {
     const { HealthController } = await import('./health.controller');
     const healthController = harness.moduleRef.get(HealthController);
 
@@ -39,6 +39,9 @@ describe('Health and metrics controllers', () => {
         status: 'up',
       },
       mongodb: {
+        status: 'up',
+      },
+      elasticsearch: {
         status: 'up',
       },
     });

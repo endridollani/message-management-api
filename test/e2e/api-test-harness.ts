@@ -3,7 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { HttpAdapterHost } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
+import { MESSAGE_SEARCH } from '@app/domain';
+import type { MessageSearchPort } from '@app/domain';
 import { CorrelationIdContext } from '@app/observability';
+import { ElasticsearchHealthIndicator, IndexManagerService } from '@app/search';
 import { json } from 'express';
 import { Connection } from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -19,6 +22,7 @@ export type ApiTestHarness = {
   moduleRef: TestingModule;
   connection: Connection;
   replSet: MongoMemoryReplSet;
+  searchPort: jest.Mocked<MessageSearchPort>;
   close: () => Promise<void>;
 };
 
@@ -41,9 +45,38 @@ export async function createApiTestHarness(): Promise<ApiTestHarness> {
   };
 
   const { ApiModule } = await import('../../apps/api/src/api.module');
+  const searchPort: jest.Mocked<MessageSearchPort> = {
+    indexMessage: jest.fn(),
+    searchMessages: jest.fn().mockResolvedValue({
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    }),
+  };
   const moduleRef = await Test.createTestingModule({
     imports: [ApiModule],
-  }).compile();
+  })
+    .overrideProvider(MESSAGE_SEARCH)
+    .useValue(searchPort)
+    .overrideProvider(IndexManagerService)
+    .useValue({
+      ensureMessagesIndex: jest.fn(),
+      onModuleInit: jest.fn(),
+    })
+    .overrideProvider(ElasticsearchHealthIndicator)
+    .useValue({
+      isReadReady: jest.fn().mockReturnValue({
+        elasticsearch: {
+          alias: 'messages-read',
+          status: 'up',
+        },
+      }),
+    })
+    .compile();
   const app = moduleRef.createNestApplication({
     bodyParser: false,
     bufferLogs: true,
@@ -82,6 +115,7 @@ export async function createApiTestHarness(): Promise<ApiTestHarness> {
     moduleRef,
     connection,
     replSet,
+    searchPort,
     close: async () => {
       await app.close();
       await replSet.stop();

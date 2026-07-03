@@ -1,13 +1,22 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ListMessagesService } from '@app/application';
+import { ListMessagesService, SearchMessagesService } from '@app/application';
 
 import { ConversationIdParamDto } from './dto/conversation-id-param.dto';
 import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
-import { ListMessagesResponse, mapListMessagesResponse } from './message-response.mapper';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
+import {
+  ListMessagesResponse,
+  mapListMessagesResponse,
+  mapSearchMessagesResponse,
+  SearchMessagesResponse,
+} from './message-response.mapper';
 
 @Controller('conversations/:conversationId/messages')
 export class ConversationMessagesController {
-  constructor(private readonly listMessagesService: ListMessagesService) {}
+  constructor(
+    private readonly listMessagesService: ListMessagesService,
+    private readonly searchMessagesService: SearchMessagesService,
+  ) {}
 
   @Get()
   async list(
@@ -22,5 +31,20 @@ export class ConversationMessagesController {
     });
 
     return mapListMessagesResponse(result);
+  }
+
+  @Get('search')
+  async search(
+    @Param() params: ConversationIdParamDto,
+    @Query() query: SearchMessagesQueryDto,
+  ): Promise<SearchMessagesResponse> {
+    const result = await this.searchMessagesService.execute({
+      conversationId: params.conversationId,
+      q: query.q,
+      ...(query.page === undefined ? {} : { page: query.page }),
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+    });
+
+    return mapSearchMessagesResponse(result);
   }
 }

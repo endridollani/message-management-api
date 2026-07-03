@@ -1,10 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Partitioners } from 'kafkajs';
 import type { IHeaders, Kafka, Producer } from 'kafkajs';
 
@@ -14,6 +8,13 @@ export type PublishJsonMessageInput = {
   topic: string;
   key: string;
   payload: unknown;
+  headers?: Record<string, string>;
+};
+
+export type PublishRawMessageInput = {
+  topic: string;
+  key: string | null;
+  value: Buffer | string | null;
   headers?: Record<string, string>;
 };
 
@@ -50,6 +51,15 @@ export class KafkaProducerService implements OnModuleInit, OnApplicationShutdown
   }
 
   async publishJson(input: PublishJsonMessageInput): Promise<void> {
+    await this.publishRaw({
+      headers: input.headers,
+      key: input.key,
+      topic: input.topic,
+      value: JSON.stringify(input.payload),
+    });
+  }
+
+  async publishRaw(input: PublishRawMessageInput): Promise<void> {
     if (!this.producer || !this.connected) {
       throw new Error('Kafka producer is not connected');
     }
@@ -60,7 +70,7 @@ export class KafkaProducerService implements OnModuleInit, OnApplicationShutdown
         {
           headers: encodeHeaders(input.headers),
           key: input.key,
-          value: JSON.stringify(input.payload),
+          value: input.value,
         },
       ],
       topic: input.topic,

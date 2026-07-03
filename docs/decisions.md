@@ -175,3 +175,31 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
   container-network URI instead of the host-run example.
 - Alternatives: advertise the replica-set member as `localhost`; require a host
   alias for `mongodb`; run all application processes inside Compose.
+
+### 21. Include Elasticsearch in API readiness once search is implemented
+
+- Context: P4B implements the Elasticsearch-backed search endpoint, so the API
+  runtime now depends on MongoDB for create/list and Elasticsearch for search.
+- Decision: API `/health/readiness` checks MongoDB and the `messages-read`
+  Elasticsearch alias.
+- Reason: the deployed API contract includes search; routing traffic to an API
+  instance that cannot serve search would violate the default production
+  readiness policy in the implementation plan.
+- Trade-off: a search-only Elasticsearch outage marks the whole API not ready
+  even though create/list would still work.
+- Alternatives: expose dependency-specific readiness or degraded readiness if a
+  deployment wants partial API availability.
+
+### 22. Pin the Elasticsearch JavaScript client to 8.14.0
+
+- Context: P4B initially installed the latest `@elastic/elasticsearch`, which was
+  9.x. The local Elasticsearch service is 8.14.3 and rejects v9 compatibility
+  headers (`compatible-with=9`).
+- Decision: pin `@elastic/elasticsearch` to `8.14.0`, matching the local
+  Elasticsearch 8.x stack used by Compose.
+- Reason: the official client major must match the cluster major for startup
+  index creation, alias checks, indexing, and search to work.
+- Trade-off: dependency upgrades must move the Docker Elasticsearch image and
+  client major together.
+- Alternatives: upgrade the Compose Elasticsearch image to 9.x; override client
+  compatibility headers manually.

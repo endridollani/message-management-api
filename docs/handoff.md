@@ -2,11 +2,12 @@
 
 ## Current Status
 
-P4A is complete: the messaging library and outbox-publisher worker are implemented
-and validated. pnpm build/test/lint are green with pnpm 11.1.1. The API still
-supports authenticated message creation with transactional Message + OutboxEvent
-writes and authenticated cursor-paginated conversation message listing; P4A did
-not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands.
+P4B is complete: Elasticsearch search library, search-indexer worker, and the API
+search endpoint are implemented and validated. pnpm build/test/lint are green with
+pnpm 11.1.1. The API supports authenticated message creation, cursor-paginated
+conversation message listing, and Elasticsearch-backed conversation search.
+Transactional outbox publishing and Kafka-backed indexing were manually verified
+locally. CLI commands are still not implemented.
 
 ## Complete
 
@@ -33,7 +34,7 @@ not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands
     mappers, `POST /api/messages`, and `GET /api/conversations/:conversationId/messages`.
   - Contract tests use `MongoMemoryReplSet`; unit tests cover the transaction helper,
     create service, cursor utilities, and list service.
-- P4A is complete:
+- P4A remains complete:
   - `libs/messaging` wraps KafkaJS with topic constants, Kafka client lifecycle,
     topic initialization for `messages.message-created.v1` and
     `messages.message-created.v1.dlq`, Kafka readiness, and a JSON producer that
@@ -50,12 +51,33 @@ not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands
   - Unit tests cover claim/publish/mark flow, retry/backoff, max attempts to
     failed, expired lease reclaim query, lock-owner-safe no-match behavior, topic
     initialization, and producer `acks: -1`.
+- P4B is complete:
+  - `libs/domain` defines a search port and `SearchUnavailableError`.
+  - `libs/application` provides `SearchMessagesService`.
+  - `libs/search` wires `@nestjs/elasticsearch` to an 8.x Elasticsearch client,
+    defines the strict `messages-v1` mapping, manages `messages-read` and
+    `messages-write` aliases idempotently, exposes ES readiness, indexes through
+    the write alias using `_id = message.id`, and searches through the read alias
+    with a conversation filter and content match.
+  - `apps/search-indexer` consumes `messages.message-created.v1` with consumer
+    group `message-management-api.search-indexer`, validates v1 envelopes,
+    projects only mapped fields, retries retryable ES failures with bounded
+    backoff, publishes malformed/non-retryable/exhausted messages to
+    `messages.message-created.v1.dlq` with error headers, and exposes
+    health/readiness/metrics on `INDEXER_HEALTH_PORT`.
+  - `apps/api` implements
+    `GET /api/conversations/:conversationId/messages/search?q=term`, maps search
+    unavailability to 503, and now includes Elasticsearch read-alias readiness.
+  - Unit and API contract tests cover index manager behavior, ES query DSL/hit
+    mapping, search-indexer happy path, unknown version skip, malformed event to
+    DLQ, retryable/non-retryable ES errors, duplicate idempotent indexing, and API
+    search validation/response/error mapping.
 
 ## Remaining
 
-- Remaining P4 work is explicitly out of scope for P4A: Elasticsearch search lib,
-  search-indexer worker, search endpoint behavior, DLQ consumer/redrive behavior,
-  and CLI commands.
+- CLI commands remain: `outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and
+  `es:reindex`.
+- Full Testcontainers integration suite and CI hardening remain future phases.
 
 ## Known Issues
 
@@ -65,11 +87,15 @@ not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands
   `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
 - No separate e2e script exists yet. P3 API contract tests are included in
   `pnpm run test`.
-- API readiness checks MongoDB. Elasticsearch readiness is intentionally deferred
-  until the search endpoint and ES client are implemented.
 - Host-run local runtimes should use
   `mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true`
   because the local replica set advertises the container hostname internally.
+- Local Elasticsearch may refuse new shard allocation if Docker disk usage is
+  above the high watermark. During P4B smoke verification this made `messages-v1`
+  red until `cluster.routing.allocation.disk.threshold_enabled=false` was applied
+  transiently and then restored after verification.
+- Keep `@elastic/elasticsearch` pinned to 8.x while Compose runs Elasticsearch
+  8.14.x; the 9.x client sends incompatible compatibility headers.
 
 ## Last Commands
 
@@ -84,9 +110,17 @@ not add Elasticsearch, search-indexer, search endpoint behavior, or CLI commands
   host-run `directConnection=true` MongoDB URI on `OUTBOX_HEALTH_PORT=3311`,
   readiness returned 200, MongoDB row transitioned to `published`, and the event
   appeared on Kafka topic `messages.message-created.v1`.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @nestjs/elasticsearch @elastic/elasticsearch` - passed using pnpm 11.1.1, but initially installed an incompatible 9.x ES client.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @elastic/elasticsearch@8.14.0` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed using pnpm 11.1.1; 17 suites and 53 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run format:check` - failed because pre-existing files outside the P4B slice are not Prettier-formatted.
+- `docker compose up -d mongodb mongodb-init kafka elasticsearch` - passed; all infra containers were healthy.
+- Manual P4B create-to-search verification - passed: host-run API on `PORT=3410`, outbox on `OUTBOX_HEALTH_PORT=3411`, and search-indexer on `INDEXER_HEALTH_PORT=3412` all reported readiness; POST created message `6a479ab73d530e785e1b76df`; search returned it from Elasticsearch through the API.
 
 ## Next Step
 
-Proceed to the next requested P4 slice only when requested: Elasticsearch search lib,
-search-indexer worker, Elasticsearch-backed search endpoint behavior, DLQ/redrive,
-or CLI commands.
+Proceed to the CLI slice only when requested: `outbox:inspect`, `outbox:redrive`,
+`dlq:redrive`, and `es:reindex`. Do not implement unrelated pipeline changes unless
+required for CLI type compatibility.

@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import { SearchUnavailableError } from '@app/domain';
 import { CorrelationIdContext } from '@app/observability';
 import type { Request, Response } from 'express';
 
@@ -28,7 +29,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const correlationId =
       this.correlationIdContext.getCorrelationId() ?? request.header('x-correlation-id');
 
-    if (!(exception instanceof HttpException)) {
+    if (!(exception instanceof HttpException) && !(exception instanceof SearchUnavailableError)) {
       this.logger.error(
         'Unhandled exception',
         exception instanceof Error ? exception.stack : undefined,
@@ -55,12 +56,24 @@ type ErrorBody = {
 };
 
 function getStatusCode(exception: unknown): number {
+  if (exception instanceof SearchUnavailableError) {
+    return HttpStatus.SERVICE_UNAVAILABLE;
+  }
+
   return exception instanceof HttpException
     ? exception.getStatus()
     : HttpStatus.INTERNAL_SERVER_ERROR;
 }
 
 function getErrorBody(exception: unknown, statusCode: number): ErrorBody {
+  if (exception instanceof SearchUnavailableError) {
+    return {
+      error: 'Service Unavailable',
+      message: exception.message,
+      statusCode,
+    };
+  }
+
   if (!(exception instanceof HttpException)) {
     return {
       error: 'Internal Server Error',

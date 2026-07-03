@@ -38,4 +38,39 @@ describe('KafkaProducerService', () => {
     });
     expect(producer.disconnect).toHaveBeenCalledTimes(1);
   });
+
+  it('sends raw values for DLQ publishing', async () => {
+    const producer = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      send: jest.fn(),
+    };
+    const kafka = {
+      producer: jest.fn(() => producer),
+    };
+    const service = new KafkaProducerService(kafka as never);
+    const value = Buffer.from('not-json');
+
+    await service.onModuleInit();
+    await service.publishRaw({
+      headers: { 'x-error-message': 'bad event' },
+      key: 'conversation-1',
+      topic: 'messages.message-created.v1.dlq',
+      value,
+    });
+
+    expect(producer.send).toHaveBeenCalledWith({
+      acks: -1,
+      messages: [
+        {
+          headers: {
+            'x-error-message': Buffer.from('bad event'),
+          },
+          key: 'conversation-1',
+          value,
+        },
+      ],
+      topic: 'messages.message-created.v1.dlq',
+    });
+  });
 });

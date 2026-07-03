@@ -13,7 +13,15 @@ export {
   toMessageCreatedEventPayload,
 } from './events/message-created.event';
 export type { MessageCreatedEvent } from './events/message-created.event';
+export { SearchUnavailableError } from './errors/search-unavailable.error';
 export type { MessageRepositoryPort } from './ports/message-repository.port';
+export type {
+  MessageSearchPort,
+  SearchMessageDocument,
+  SearchMessageHit,
+  SearchMessagesQuery,
+  SearchMessagesResult,
+} from './ports/message-search.port';
 export type {
   ClaimPublishableOutboxEventsInput,
   CreateOutboxEventInput,
@@ -26,4 +34,9 @@ export type {
   ScheduleOutboxRetryInput,
 } from './ports/outbox-repository.port';
 export type { TransactionManagerPort } from './ports/transaction-manager.port';
-export { MESSAGE_REPOSITORY, OUTBOX_REPOSITORY, TRANSACTION_MANAGER } from './ports/tokens';
+export {
+  MESSAGE_REPOSITORY,
+  MESSAGE_SEARCH,
+  OUTBOX_REPOSITORY,
+  TRANSACTION_MANAGER,
+} from './ports/tokens';

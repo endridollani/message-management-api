@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { Types } from 'mongoose';
 import type { Connection } from 'mongoose';
+import { SearchUnavailableError } from '@app/domain';
 
 import { createApiTestHarness, VALID_API_KEY, type ApiTestHarness } from './api-test-harness';
 
@@ -44,6 +45,15 @@ describe('Messages API contract', () => {
   beforeEach(async () => {
     await connection.db?.dropDatabase();
     await connection.syncIndexes();
+    harness.searchPort.searchMessages.mockResolvedValue({
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    });
   });
 
   it('creates a message and outbox event atomically', async () => {
@@ -89,8 +99,8 @@ describe('Messages API contract', () => {
       status: 'pending',
       attempts: 0,
       payload: expect.objectContaining({
-          correlationId: 'correlation-1',
-          payload: expect.objectContaining({
+        correlationId: 'correlation-1',
+        payload: expect.objectContaining({
           id: body.id,
           content: 'hello world',
         }),
@@ -174,6 +184,91 @@ describe('Messages API contract', () => {
       .query({ cursor: 'invalid' })
       .set('x-api-key', VALID_API_KEY)
       .expect(400);
+  });
+
+  it('searches conversation messages with a mocked search port', async () => {
+    harness.searchPort.searchMessages.mockResolvedValueOnce({
+      data: [
+        {
+          id: '64f2d8e7a088f5d3d879c001',
+          conversationId: 'conversation-1',
+          senderId: 'sender-1',
+          content: 'hello search',
+          timestamp: new Date('2026-07-03T09:00:00.000Z'),
+          score: 1.25,
+          metadata: { channel: 'sms' },
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 5,
+        total: 11,
+        totalPages: 3,
+      },
+    });
+
+    const response = await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages/search')
+      .query({ q: 'hello', page: 2, limit: 5 })
+      .set('x-api-key', VALID_API_KEY)
+      .expect(200);
+
+    expect(harness.searchPort.searchMessages.mock.calls).toContainEqual([
+      {
+        conversationId: 'conversation-1',
+        q: 'hello',
+        page: 2,
+        limit: 5,
+      },
+    ]);
+    expect(response.body).toEqual({
+      data: [
+        {
+          id: '64f2d8e7a088f5d3d879c001',
+          conversationId: 'conversation-1',
+          senderId: 'sender-1',
+          content: 'hello search',
+          timestamp: '2026-07-03T09:00:00.000Z',
+          score: 1.25,
+          metadata: { channel: 'sms' },
+        },
+      ],
+      pagination: {
+        page: 2,
+        limit: 5,
+        total: 11,
+        totalPages: 3,
+      },
+    });
+  });
+
+  it('rejects invalid search queries', async () => {
+    await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages/search')
+      .set('x-api-key', VALID_API_KEY)
+      .expect(400);
+
+    await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages/search')
+      .query({ q: 'term', limit: 51 })
+      .set('x-api-key', VALID_API_KEY)
+      .expect(400);
+  });
+
+  it('maps search unavailability to 503', async () => {
+    harness.searchPort.searchMessages.mockRejectedValueOnce(new SearchUnavailableError());
+
+    const response = await request(httpServer(app))
+      .get('/api/conversations/conversation-1/messages/search')
+      .query({ q: 'term' })
+      .set('x-api-key', VALID_API_KEY)
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      path: '/api/conversations/conversation-1/messages/search?q=term',
+    });
   });
 });
 

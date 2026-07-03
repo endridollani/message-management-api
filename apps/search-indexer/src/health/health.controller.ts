@@ -1,34 +1,31 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthCheck, HealthCheckResult, HealthCheckService } from '@nestjs/terminus';
+import { KafkaHealthIndicator } from '@app/messaging';
 import { RuntimeHealthIndicator } from '@app/observability';
-import { MongoHealthIndicator } from '@app/persistence';
 import { ElasticsearchHealthIndicator } from '@app/search';
 
-import { Public } from '../auth/public.decorator';
-
-@Public()
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
     private readonly runtimeHealthIndicator: RuntimeHealthIndicator,
-    private readonly mongoHealthIndicator: MongoHealthIndicator,
+    private readonly kafkaHealthIndicator: KafkaHealthIndicator,
     private readonly elasticsearchHealthIndicator: ElasticsearchHealthIndicator,
   ) {}
 
   @Get('liveness')
   @HealthCheck()
   liveness(): Promise<HealthCheckResult> {
-    return this.health.check([() => this.runtimeHealthIndicator.isLive('api')]);
+    return this.health.check([() => this.runtimeHealthIndicator.isLive('search-indexer')]);
   }
 
   @Get('readiness')
   @HealthCheck()
   readiness(): Promise<HealthCheckResult> {
     return this.health.check([
-      () => this.runtimeHealthIndicator.isReady('api', ['mongodb', 'elasticsearch']),
-      () => this.mongoHealthIndicator.isReady(),
-      () => this.elasticsearchHealthIndicator.isReadReady(),
+      () => this.runtimeHealthIndicator.isReady('search-indexer', ['kafka', 'elasticsearch']),
+      () => this.kafkaHealthIndicator.isReady(),
+      () => this.elasticsearchHealthIndicator.isWriteReady(),
     ]);
   }
 }

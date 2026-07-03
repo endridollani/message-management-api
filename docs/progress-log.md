@@ -75,11 +75,11 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
 ## 2026-07-03 - P3: Core API system of record
 
 - Scope: implemented the domain, Mongo persistence, application services, and API
-  write/read path for the system-of-record slice. `POST /api/messages` now creates a
-  `Message` and pending `OutboxEvent` atomically in one MongoDB transaction; `GET
-  /api/conversations/:conversationId/messages` lists messages with cursor pagination
-  behind API-key auth. Kafka, publisher worker, Elasticsearch, search endpoint behavior,
-  and CLI commands remain out of scope.
+  write/read path for the system-of-record slice. `POST /api/messages` now creates
+  a `Message` and pending `OutboxEvent` atomically in one MongoDB transaction;
+  `GET /api/conversations/:conversationId/messages` lists messages with cursor
+  pagination behind API-key auth. Kafka, publisher worker, Elasticsearch, search
+  endpoint behavior, and CLI commands remain out of scope.
 - Files touched: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
   `apps/api/src/`, `libs/domain/src/`, `libs/persistence/src/`,
   `libs/application/src/`, `libs/config/src/`, `libs/observability/src/`,
@@ -132,3 +132,50 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
 - Next action: proceed to the next requested P4 slice only when requested:
   Elasticsearch search lib, search-indexer, search endpoint behavior, DLQ/redrive,
   or CLI commands.
+
+## 2026-07-03 - P4B: Elasticsearch search lib, search-indexer, and search endpoint
+
+- Scope: implemented the Elasticsearch-backed P4B slice only. Added the search
+  domain port and `SearchMessagesService`; added `libs/search` with
+  `@nestjs/elasticsearch`, strict `messages-v1` mapping, idempotent
+  `IndexManagerService`, `messages-read`/`messages-write` aliases, ES readiness,
+  and `EsMessageSearch`. Added the API search endpoint
+  `GET /api/conversations/:conversationId/messages/search`, 503 mapping for
+  search unavailability, and API readiness on MongoDB + Elasticsearch. Added the
+  search-indexer runtime with Kafka consumption from `messages.message-created.v1`,
+  event validation/projection, bounded retry for retryable ES failures, DLQ
+  publishing to `messages.message-created.v1.dlq`, health/readiness, and metrics.
+  CLI commands remain out of scope.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `apps/api/src/`,
+  `apps/search-indexer/src/`, `libs/application/src/`, `libs/domain/src/`,
+  `libs/messaging/src/`, `libs/observability/src/`, `libs/search/src/`,
+  `test/e2e/`, and docs.
+- Validation:
+  - `pnpm add -w @nestjs/elasticsearch @elastic/elasticsearch` - passed using
+    pnpm 11.1.1, but installed `@elastic/elasticsearch` 9.x initially.
+  - `pnpm add -w @elastic/elasticsearch@8.14.0` - passed using pnpm 11.1.1 after
+    local smoke testing showed the ES 8.14.3 cluster rejects v9 client
+    compatibility headers.
+  - `pnpm run typecheck` - passed using pnpm 11.1.1.
+  - `pnpm run test --runInBand` - passed using pnpm 11.1.1; 17 suites and 53
+    tests passed.
+  - `pnpm run test` - passed using pnpm 11.1.1; 17 suites and 53 tests passed.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+  - `pnpm run format:check` - failed because pre-existing files outside the P4B
+    slice are not Prettier-formatted; P4B-touched files were formatted directly.
+  - `docker compose up -d mongodb mongodb-init kafka elasticsearch` - passed;
+    MongoDB, Kafka, and Elasticsearch containers were healthy.
+  - Runtime readiness smoke - passed after the ES client pin: API readiness
+    reported MongoDB + `messages-read`, outbox readiness reported MongoDB +
+    Kafka, and search-indexer readiness reported Kafka + `messages-write`.
+  - Manual create-to-search smoke - passed: `POST /api/messages` created message
+    `6a479ab73d530e785e1b76df`; outbox publisher and search-indexer processed it;
+    `GET /api/conversations/p4b-verify-1783077559/messages/search?q=smoke&limit=5`
+    returned the indexed hit with score and pagination.
+- Open issues: CLI redrive/reindex commands remain unimplemented. Local
+  Elasticsearch initially kept `messages-v1` red because the Docker node was over
+  the disk high watermark; temporarily disabling the transient disk allocation
+  threshold allowed the smoke test, and the setting was restored afterward.
+- Next action: proceed to the CLI slice only when requested:
+  `outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and `es:reindex`.
