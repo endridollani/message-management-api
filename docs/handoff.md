@@ -2,17 +2,15 @@
 
 ## Current Status
 
-P6 is complete: integration verification and CI hardening are implemented.
-Post-P6 TypeScript/Jest editor tooling is also fixed: test files are covered by
-`tsconfig.spec.json` with Node + Jest globals, production `tsconfig.json` remains
-test-free with Node globals only, `ts-jest` uses the spec tsconfig, and ESLint
-typed parsing knows both TS projects while limiting Jest globals to test files.
-The repo has explicit unit, e2e, integration, and CI test scripts; the integration
-suite runs the production pipeline against disposable MongoDB, Kafka, and
-Elasticsearch Testcontainers; CI defines install, lint, typecheck, unit, e2e,
-integration, build, docker-build, and non-blocking production audit jobs. Latest
-pnpm 11.1.1 validation is green for typecheck, unit, e2e, integration, lint, and
-build.
+P7 is complete: documentation and ops readiness are current for the implemented
+API, outbox publisher, search indexer, CLI, integration tests, CI, and Docker
+build targets. README now includes a clean-clone quick start, local API key hash
+generation, architecture, runtime apps, Compose infra startup, development mode,
+API endpoints, auth header, test commands, CI checks, Docker build commands, and
+production notes. API examples, observability docs, security docs, and all four
+runbooks now match the implemented behavior. Latest pinned pnpm 11.1.1
+validation is green for typecheck, test:ci, lint, and build; `docker compose
+config` is green.
 
 ## Complete
 
@@ -121,10 +119,30 @@ build.
     Jest globals.
   - Jest transforms use `tsconfig.spec.json`, and ESLint uses both production and
     spec TS projects with Jest globals scoped to tests.
+- P7 is complete:
+  - `README.md` documents clean-clone setup with pnpm, local dev API key hash
+    generation, architecture, runtime apps, Compose infra startup, host-run
+    development mode, API endpoints, auth header, test commands, CI checks,
+    Docker build targets, and production limitations.
+  - `docs/api-examples.md` covers create, list, search, validation 400, auth
+    401, search unavailable 503, health/readiness, and metrics examples.
+  - `docs/observability.md` matches emitted health routes, readiness policy,
+    correlation ID behavior, log redaction, metric names, and the known KafkaJS
+    warning.
+  - `docs/security.md` matches API-key hashing/comparison behavior, senderId
+    trust, health/metrics exposure policy, secret handling, and key rotation.
+  - Runbooks cover outbox lifecycle/inspection/redrive/stuck-event diagnosis,
+    DLQ inspection/redrive/poison-message handling, ES v1/v2 alias reindex with
+    rollback, and local debugging for Compose, Testcontainers, ES disk
+    watermarks, Kafka listener/coordinator logs, and Mongo/Kafka/ES inspection.
+  - `docs/decisions.md` now includes the known local KafkaJS
+    `TimeoutNegativeWarning` decision in addition to prior implementation
+    decisions.
 
 ## Remaining
 
-- P7 documentation and ops readiness remain future work.
+- P8 final validation and final handoff remain future work. Do not start P8
+  unless requested.
 
 ## Known Issues
 
@@ -148,6 +166,14 @@ build.
 - The integration suite may emit the same KafkaJS `TimeoutNegativeWarning` plus
   transient coordinator logs while the single-node Kafka container forms
   consumer groups. The final P6 runs passed consistently despite this noise.
+- During the P7 README smoke check, an existing local Elasticsearch volume had
+  `read_only_allow_delete` set because Docker disk usage previously exceeded the
+  ES flood-stage watermark. Applying the documented local-debugging procedure
+  cleared the block; the transient disk-threshold override was restored after
+  the successful smoke.
+- Running `pnpm run start:cli -- outbox:inspect` with the ambient pnpm 11.7.0
+  shim triggered its supply-chain policy and failed on a minimum-release-age
+  check. Validation used the pinned pnpm 11.1.1 executable directly.
 
 ## Last Commands
 
@@ -202,8 +228,18 @@ build.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed after removing specs from production tsconfig because ESLint only saw the production project; final rerun passed after adding the spec tsconfig to ESLint.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:integration` - passed; 1 suite and 10 tests passed, with the known KafkaJS warning/coordinator noise.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:ci` - passed; unit, e2e, and integration suites green with the known KafkaJS warning/coordinator noise.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed.
+- `docker compose config` - passed.
+- README quick-start smoke against the existing local stack - first create/list
+  passed but search returned empty because Elasticsearch had a local
+  flood-stage read-only block; after applying the documented ES disk-watermark
+  remediation and restoring the transient setting, create/list/search passed.
 
 ## Next Step
 
-Proceed to P7 only when requested: documentation and ops readiness. Do not
-implement Kubernetes, UI, automated DLQ redrive, or schema registry.
+Proceed to P8 final validation only when requested. Do not implement Kubernetes,
+UI, automated DLQ redrive, schema registry, or new runtime behavior as part of
+P8 unless an actual validation bug requires it.

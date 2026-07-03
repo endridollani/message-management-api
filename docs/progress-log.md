@@ -278,3 +278,40 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
 - Open issues: the local ambient `pnpm` shim still reports 11.7.0, so validation
   used the pinned pnpm 11.1.1 executable directly.
 - Next action: proceed to P7 documentation and ops readiness only when requested.
+
+## 2026-07-03 - P7: Documentation and ops readiness
+
+- Scope: completed the documentation-readiness slice. Rewrote the README for a
+  clean-clone quick start, local dev API key hash generation, architecture,
+  runtime apps, Compose infra startup, development mode, API endpoints, auth
+  header, test commands, CI checks, Docker build commands, and production notes.
+  Updated API examples, observability docs, security docs, and all four runbooks
+  to match the implemented API, workers, CLI commands, metrics, health routes,
+  readiness policy, ES alias model, DLQ/outbox behavior, and known local KafkaJS
+  warning.
+- Files touched: `README.md`, `docs/api-examples.md`,
+  `docs/observability.md`, `docs/security.md`,
+  `docs/runbooks/outbox.md`, `docs/runbooks/dlq-redrive.md`,
+  `docs/runbooks/reindex-elasticsearch.md`,
+  `docs/runbooks/local-debugging.md`, `docs/decisions.md`,
+  `docs/progress-log.md`, and `docs/handoff.md`.
+- Validation, all using the pinned pnpm 11.1.1 executable where pnpm was used:
+  - `pnpm run typecheck` - passed.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration suites green. The
+    integration run emitted the known KafkaJS `TimeoutNegativeWarning` and
+    transient coordinator logs.
+  - `pnpm run lint` - passed.
+  - `pnpm run build` - passed.
+  - `docker compose config` - passed.
+  - README quick-start smoke against the existing local stack - create and list
+    passed immediately; search initially failed because the existing local
+    Elasticsearch index was blocked by Docker disk flood-stage
+    `read_only_allow_delete`. After applying the documented local-debugging
+    disk-watermark procedure and restoring the transient cluster setting,
+    create -> list -> search passed with an indexed hit.
+- Open issues: no remaining P7 documentation gaps. The local ambient `pnpm` shim
+  still reports 11.7.0, so use the pinned pnpm 11.1.1 executable or Corepack
+  11.1.1 for validation. Existing local Elasticsearch volumes may still need the
+  documented disk-watermark remediation if Docker disk remains high.
+- Next action: P7 is complete. Proceed to P8 final validation and handoff only
+  when requested.

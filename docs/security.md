@@ -1,45 +1,101 @@
 # Security
 
-Owner note: Update this file in the same change that changes authentication, authorization, input validation, request limits, secret handling, dependency posture, or deployment exposure.
+Update this file in the same change that changes authentication, authorization,
+input validation, request limits, secret handling, dependency posture, or
+deployment exposure.
 
-## Planned Coverage
+## API-Key Boundary
 
-- API-key auth mechanism and rotation procedure.
-- `senderId` trust model.
-- JWT extension path for user-facing deployments.
-- Health and `/metrics` exposure assumptions.
-- Injection, size-limit, and secrets-handling notes.
+Message endpoints require `x-api-key`:
 
-## P3 Implemented Security Boundary
+- `POST /api/messages`
+- `GET /api/conversations/:conversationId/messages`
+- `GET /api/conversations/:conversationId/messages/search`
 
-### API Keys
+`API_KEYS` is a comma-separated list of `name:sha256(raw-key)` entries. Raw keys
+are never stored in config. The guard hashes the presented key with SHA-256 and
+compares it to configured hashes with `timingSafeEqual`; on success it attaches
+the configured key name to the request object for audit use.
 
-- `POST /api/messages` and `GET /api/conversations/:conversationId/messages` require
-  the `x-api-key` header.
-- `API_KEYS` is a comma-separated list of `name:sha256(raw-key)` entries. Raw keys are
-  never stored in config.
-- The guard hashes the presented key with SHA-256 and compares it to configured hashes
-  with `timingSafeEqual`.
-- Missing or invalid keys return the standard `401` error shape.
-- `x-api-key` is redacted from structured request logs.
+Missing or invalid keys return the standard `401` error shape with message
+`Invalid API key`.
 
-### Public Operational Routes
+Generate a local development hash:
 
-`GET /health/liveness`, `GET /health/readiness`, and `GET /metrics` remain unauthenticated
-in P3. They must be exposed only on private networks or protected externally in any
-public-facing deployment.
+```sh
+DEV_API_KEY='local-dev-key' node -e 'const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha256").update(process.env.DEV_API_KEY).digest("hex"));'
+```
 
-### Input Validation
+Then set:
 
-- Global validation uses `whitelist`, `forbidNonWhitelisted`, and explicit transform.
-- `conversationId` and `senderId` are trimmed opaque IDs with max length 128 and pattern
-  `^[A-Za-z0-9_:.-]+$`.
+```dotenv
+API_KEYS=local-dev:<printed-sha256-hash>
+```
+
+## Key Rotation
+
+Use overlapping keys:
+
+1. Add a new `name:hash` entry to `API_KEYS` while keeping existing entries.
+2. Deploy/restart all API instances.
+3. Move callers to the new raw key.
+4. Confirm old-key traffic has stopped in logs/gateway telemetry.
+5. Remove the old entry and deploy/restart again.
+
+Never commit raw keys or hashes for real environments. Store them in the
+deployment secret manager and inject them as environment variables.
+
+## Secret Handling
+
+- `.env` is for local development and must stay out of git.
+- `x-api-key`, `authorization`, and `cookie` request headers are redacted from
+  structured logs.
+- Do not log request bodies in production; message content and metadata can be
+  sensitive.
+- Elasticsearch credentials/TLS are not configured for local Compose and must be
+  supplied by production deployment configuration.
+
+## senderId Trust Model
+
+`senderId` is caller-asserted and trusted only because this API is scoped to
+API-key-authenticated internal services. The service does not verify that
+`senderId` belongs to an end user.
+
+For a public or user-facing deployment, remove or ignore body `senderId` and
+derive sender identity from the authenticated principal, for example a JWT `sub`
+claim validated through Passport/JWKS or an API gateway. That JWT extension path
+is documented as future work and is not implemented in this repo.
+
+## Health And Metrics Exposure
+
+`GET /health/liveness`, `GET /health/readiness`, and `GET /metrics` are
+unauthenticated in the application. This is acceptable only for local
+development, private networks, or deployments where an external gateway/service
+mesh protects operational routes.
+
+Do not expose `/metrics` publicly. It can reveal runtime, dependency, and volume
+information useful to attackers.
+
+## Input Validation And Request Limits
+
+- Global validation uses `whitelist`, `forbidNonWhitelisted`, `transform`, and
+  explicit numeric transforms only.
+- Unknown JSON properties are rejected.
+- `conversationId` and `senderId` are trimmed opaque IDs with max length 128 and
+  pattern `^[A-Za-z0-9_:.-]+$`.
 - `content` is trimmed, non-empty, and capped at 5,000 characters.
-- `metadata` must be a top-level plain JSON object and is capped at 10 KB serialized.
-- The request body limit remains `100kb`.
+- `metadata` must be a top-level plain JSON object and is capped at 10 KB
+  serialized.
+- Express JSON body size is capped at `100kb`.
 
-### senderId Trust Model
+Message content is stored and indexed as data. The service does not HTML-sanitize
+content; output encoding is the responsibility of clients that render content.
 
-`senderId` is trusted only because this API is scoped to API-key-authenticated internal
-services. A public user-facing deployment must derive sender identity from an
-authenticated principal, such as a JWT `sub`, and remove or ignore body `senderId`.
+## Dependency And CI Posture
+
+CI runs lint, typecheck, unit, e2e, integration, build, Docker builds, and a
+production dependency audit. The audit job is currently non-blocking by design
+while baseline policy is finalized, but findings must still be reviewed.
+
+Keep `@elastic/elasticsearch` on the same major as the Elasticsearch cluster.
+The current local stack uses Elasticsearch `8.14.3` and client `8.14.x`.

@@ -1,21 +1,23 @@
 # Outbox Runbook
 
-## Runtime
+The API writes `messages` and `outbox_events` in one MongoDB transaction. The
+outbox-publisher runtime claims due outbox rows, publishes them to Kafka, and
+marks them complete only after Kafka acknowledges the send.
 
-Start local dependencies:
+## Start Locally
 
 ```sh
 pnpm install --frozen-lockfile
 docker compose up -d mongodb mongodb-init kafka
+pnpm run start:outbox-publisher
 ```
 
-Start the publisher:
+Host-run defaults come from `.env`. If exporting manually:
 
 ```sh
-MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
-KAFKA_BROKERS='localhost:9094' \
-KAFKA_CLIENT_ID='message-management-api' \
-pnpm run start:outbox-publisher
+export MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true'
+export KAFKA_BROKERS='localhost:9094'
+export KAFKA_CLIENT_ID='message-management-api'
 ```
 
 Operational endpoints:
@@ -28,35 +30,35 @@ Operational endpoints:
 
 - `pending`: created by the API transaction or scheduled for retry. The publisher
   only claims pending rows whose `nextAttemptAt` is due.
-- `publishing`: claimed by one publisher instance. The row has `lockedBy` and
-  `lockedAt`.
-- `published`: Kafka ack succeeded and the worker marked the row published.
-- `failed`: max attempts were exhausted. Failed rows are terminal and are never
-  auto-published.
+- `publishing`: claimed by one publisher instance with `lockedBy` and `lockedAt`.
+- `published`: Kafka ack succeeded and the row was marked published.
+- `failed`: max attempts were exhausted. Failed rows are terminal until an
+  operator explicitly redrives them.
 
 The publisher also reclaims expired `publishing` rows when `lockedAt` is older
 than `OUTBOX_LOCK_TIMEOUT_MS`. Every transition out of `publishing` uses this
-filter:
+lock-owner-safe filter:
 
 ```js
 { _id, lockedBy: instanceId, status: 'publishing' }
 ```
 
-If that update matches zero rows, the worker logs a warning and leaves the row to
+If the update matches zero rows, the worker logs a warning and leaves the row to
 its current owner/state.
 
-## Retry Behavior
+## Retry And Terminal Failure
 
-On publish failure, attempts are incremented and the row is returned to `pending`
-with exponential backoff and jitter:
+On publish failure, the row returns to `pending`, `attempts` increments, and
+`nextAttemptAt` is scheduled with exponential backoff and jitter:
 
 - base delay starts at 1 second
 - delay doubles per attempt
 - delay caps at 5 minutes
 - jitter is +/-20 percent
 
-`OUTBOX_MAX_ATTEMPTS` defaults to `10`. Once exhausted, the row is marked
-`failed`; there is no automatic redrive in P4A.
+`OUTBOX_MAX_ATTEMPTS` defaults to `10`. After that, the row is marked `failed`.
+Failed rows are never auto-published; this prevents silent infinite retries of a
+poison event or a permanently invalid broker/topic state.
 
 ## Metrics To Watch
 
@@ -66,67 +68,56 @@ with exponential backoff and jitter:
 - `message_management_outbox_events_failed_total`
 - `message_management_outbox_publish_duration_seconds`
 
-Investigate if oldest pending age grows continuously, failed events increase, or
-readiness fails on MongoDB/Kafka.
+Investigate when oldest pending age grows continuously, failed events increase,
+or readiness fails on MongoDB/Kafka.
 
-## Manual Inspection
+## Inspect
 
 Preferred CLI inspection:
 
 ```sh
-MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
-KAFKA_BROKERS='localhost:9094' \
-ELASTICSEARCH_NODE='http://localhost:9200' \
 pnpm run start:cli -- outbox:inspect
+pnpm run start:cli -- outbox:inspect --failed-limit 25
 ```
 
-The command prints pending/publishing/published/failed counts, oldest pending
-age, and a bounded summary of failed events. Use `--failed-limit N` to change
-the failed-event summary size.
-
-Pending rows:
+Direct MongoDB inspection:
 
 ```sh
 docker compose exec mongodb mongosh --quiet message_management --eval \
-  "db.outbox_events.find({ status: 'pending' }).sort({ _id: 1 }).limit(20).toArray()"
-```
+  "db.outbox_events.aggregate([{ \$group: { _id: '\$status', count: { \$sum: 1 } } }]).toArray()"
 
-Failed rows:
-
-```sh
 docker compose exec mongodb mongosh --quiet message_management --eval \
-  "db.outbox_events.find({ status: 'failed' }).sort({ nextAttemptAt: -1 }).limit(20).toArray()"
+  "db.outbox_events.find({ status: 'pending' }).sort({ nextAttemptAt: 1, _id: 1 }).limit(20).toArray()"
+
+docker compose exec mongodb mongosh --quiet message_management --eval \
+  "db.outbox_events.find({ status: 'failed' }).sort({ nextAttemptAt: 1, _id: 1 }).limit(20).toArray()"
 ```
 
-Kafka topic contents can be inspected with the broker container:
+Kafka topic inspection:
 
 ```sh
 docker compose exec kafka /opt/bitnami/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
   --topic messages.message-created.v1 \
   --from-beginning \
+  --property print.key=true \
   --max-messages 10
 ```
 
-## Redrive
+## Redrive Failed Rows
 
-Failed rows are terminal until an operator explicitly redrives selected rows.
 Preview first:
 
 ```sh
-MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
-KAFKA_BROKERS='localhost:9094' \
-ELASTICSEARCH_NODE='http://localhost:9200' \
 pnpm run start:cli -- outbox:redrive --dry-run
+pnpm run start:cli -- outbox:redrive --event-id <event-id> --dry-run
 ```
 
-Apply only after the poison cause is understood:
+Apply only after the failure cause is understood:
 
 ```sh
-MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
-KAFKA_BROKERS='localhost:9094' \
-ELASTICSEARCH_NODE='http://localhost:9200' \
 pnpm run start:cli -- outbox:redrive --event-id <event-id> --confirm
+pnpm run start:cli -- outbox:redrive --limit 10 --confirm
 ```
 
 Supported selectors:
@@ -141,10 +132,44 @@ The command only matches `status: failed`, resets selected rows to `pending`,
 sets `attempts` to `0`, sets `nextAttemptAt` to now, and clears lock/error
 fields. It never touches `published` rows.
 
+## Stuck Event Diagnosis
+
+1. Check publisher readiness:
+
+   ```sh
+   curl -s 'http://localhost:3001/health/readiness'
+   ```
+
+2. Inspect oldest pending rows and `nextAttemptAt`:
+
+   ```sh
+   pnpm run start:cli -- outbox:inspect --failed-limit 10
+   ```
+
+3. Confirm Kafka is reachable and the main topic exists:
+
+   ```sh
+   docker compose exec kafka /opt/bitnami/kafka/bin/kafka-topics.sh \
+     --bootstrap-server localhost:9092 \
+     --describe \
+     --topic messages.message-created.v1
+   ```
+
+4. Check for expired `publishing` rows. They should be reclaimed after
+   `OUTBOX_LOCK_TIMEOUT_MS`:
+
+   ```sh
+   docker compose exec mongodb mongosh --quiet message_management --eval \
+     "db.outbox_events.find({ status: 'publishing' }).sort({ lockedAt: 1 }).limit(20).toArray()"
+   ```
+
+5. Review publisher logs for lock-owner-safe no-match warnings, publish errors,
+   or repeated retry scheduling.
+
 ## Scale-Out
 
 The default deployment remains one publisher replica. Kafka keying preserves
 per-conversation order once messages reach Kafka, but multiple uncoordinated
-publisher replicas can race across conversations and increase duplicate
-publishes. If throughput requires scale-out, use explicit key-hash sharding so
-each outbox row is claimable by exactly one shard.
+publisher replicas can race and increase duplicate publishes. If throughput
+requires scale-out, use explicit key-hash sharding so each outbox row is
+claimable by exactly one shard.

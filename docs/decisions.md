@@ -296,3 +296,18 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Trade-off: high-severity audit findings must still be reviewed manually until
   the job is made blocking.
 - Alternatives: make audit blocking immediately; omit audit from CI.
+
+### 30. Document the local KafkaJS TimeoutNegativeWarning as non-blocking
+
+- Context: local DLQ dry-runs and Testcontainers integration runs can emit a
+  Node/KafkaJS `TimeoutNegativeWarning` while the single-node Kafka broker forms
+  consumer groups.
+- Decision: keep the current KafkaJS client and local broker setup, and document
+  the warning in observability and local-debugging docs as non-blocking when
+  readiness is green and Kafka operations complete.
+- Reason: validation and smoke checks pass consistently despite the warning, and
+  no runtime behavior change is justified for a local-only warning.
+- Trade-off: operators need to distinguish this known local warning from real
+  Kafka readiness, publish, or consumer-lag failures.
+- Alternatives: change Kafka image/client versions solely for the warning;
+  suppress Node warnings globally; treat the warning as a blocking failure.
