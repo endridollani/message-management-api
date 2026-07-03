@@ -71,3 +71,29 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `curl -s http://127.0.0.1:3310/metrics` - passed; returned Prometheus metrics including `message_management_process_cpu_user_seconds_total`.
 - Open issues: API readiness is a dependency-free placeholder until MongoDB and Elasticsearch clients are implemented in later slices.
 - Next action: proceed to Section 20 step 6 only when requested.
+
+## 2026-07-03 - P3: Core API system of record
+
+- Scope: implemented the domain, Mongo persistence, application services, and API
+  write/read path for the system-of-record slice. `POST /api/messages` now creates a
+  `Message` and pending `OutboxEvent` atomically in one MongoDB transaction; `GET
+  /api/conversations/:conversationId/messages` lists messages with cursor pagination
+  behind API-key auth. Kafka, publisher worker, Elasticsearch, search endpoint behavior,
+  and CLI commands remain out of scope.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `apps/api/src/`, `libs/domain/src/`, `libs/persistence/src/`,
+  `libs/application/src/`, `libs/config/src/`, `libs/observability/src/`,
+  `test/e2e/`, and docs.
+- Validation:
+  - `pnpm approve-builds mongodb-memory-server` - passed using pnpm 11.1.1; downloaded
+    the local MongoDB memory-server binary and recorded build approval.
+  - `pnpm run typecheck` - passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 11 test suites and 24 tests passed,
+    including MongoMemoryReplSet API contract tests.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+- Open issues: no separate e2e script exists yet; contract e2e tests currently run
+  through `pnpm run test`. API readiness checks MongoDB in P3 and will add
+  Elasticsearch when P4 implements search.
+- Next action: proceed to P4 only when requested: messaging lib, outbox publisher, ES
+  search/indexer path.

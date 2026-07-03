@@ -1,0 +1,15 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+
+import { ApiKeyGuard } from './api-key.guard';
+
+@Module({
+  providers: [
+    ApiKeyGuard,
+    {
+      provide: APP_GUARD,
+      useExisting: ApiKeyGuard,
+    },
+  ],
+})
+export class AuthModule {}

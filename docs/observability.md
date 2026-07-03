@@ -10,12 +10,15 @@ Owner note: Update this file in the same change that introduces or changes logs,
 - Runtime-specific liveness and readiness semantics.
 - Consumer lag inspection strategy.
 
-## P2B Implemented Signals
+## Implemented Signals Through P3
 
 ### HTTP Operational Routes
 
 - `GET /health/liveness` - Terminus health check proving the API process is up.
-- `GET /health/readiness` - Terminus readiness check. In P2B this is a runtime-only placeholder with `dependencies: []`; MongoDB and Elasticsearch indicators will be added when those clients are introduced.
+- `GET /health/readiness` - Terminus readiness check. In P3 this reports runtime
+  readiness with `dependencies: ["mongodb"]` and a real MongoDB connection indicator.
+  Elasticsearch readiness is deferred until the P4 search endpoint and ES client are
+  implemented.
 - `GET /metrics` - Prometheus text exposition from the API runtime.
 
 These routes are intentionally outside the `/api` global prefix.
@@ -26,6 +29,9 @@ These routes are intentionally outside the `/api` global prefix.
 - Missing correlation IDs are generated with `crypto.randomUUID()`.
 - The active ID is stored in `AsyncLocalStorage` and echoed in the `x-correlation-id` response header.
 - Global error responses include `correlationId`.
+- `CreateMessageService` stores the active HTTP correlation ID in the
+  `MessageCreatedEvent` envelope written to the outbox. Kafka headers and indexer log
+  propagation are deferred to P4.
 
 ### Structured Logging
 

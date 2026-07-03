@@ -12,9 +12,9 @@ export class RuntimeHealthIndicator {
     });
   }
 
-  isReady(runtime: string): HealthIndicatorResult<'runtime'> {
+  isReady(runtime: string, dependencies: string[] = []): HealthIndicatorResult<'runtime'> {
     return this.healthIndicatorService.check('runtime').up({
-      dependencies: [],
+      dependencies,
       runtime,
     });
   }

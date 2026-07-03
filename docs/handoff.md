@@ -2,78 +2,64 @@
 
 ## Current Status
 
-P2B foundation libraries and API runtime bootstrap are implemented. pnpm build/test/lint are green with pnpm 11.1.1, and the API health/metrics routes have been verified on a temporary local port.
+P3 core API system-of-record path is implemented. pnpm build/test/lint are green with
+pnpm 11.1.1. The API now supports authenticated message creation with transactional
+Message + OutboxEvent writes, and authenticated cursor-paginated conversation message
+listing.
 
 ## Complete
 
 - P2A infrastructure remains present:
   - `docker-compose.yml` defines MongoDB replica set initialization, Kafka in KRaft mode, and Elasticsearch.
   - `.env.example` is aligned with Section 14.
-  - No P2B change modified `docker-compose.yml`.
-- `libs/config` now provides `MessageManagementConfigModule.forRuntime(...)` with per-runtime Joi validation for `api`, `outbox-publisher`, `search-indexer`, and `cli`.
-- `libs/observability` now provides:
-  - `nestjs-pino` / `pino-http` structured logging setup.
-  - Correlation ID middleware and `AsyncLocalStorage` context.
-  - Prometheus registry/default metrics plus HTTP metric skeleton counters/histograms.
-  - Terminus runtime health indicator helpers.
-- `apps/api` now boots with:
-  - Global `/api` prefix, excluding `/health/*` and `/metrics`.
-  - Global `ValidationPipe`.
-  - Express JSON body limit of `100kb`.
-  - Global exception filter returning the standard shape with `correlationId`.
-  - `/health/liveness`, `/health/readiness`, and `/metrics`.
-  - Graceful shutdown hooks and pino logger binding.
-- Tests cover config validation and health/metrics controller behavior.
-
-## P2A Details
-
-- `docker-compose.yml` defines:
-  - `mongodb` as a single-node replica set `rs0`.
-  - `mongodb-init` as a one-shot `rs.initiate()` service.
-  - `kafka` using Bitnami legacy Kafka 3.7.1 in KRaft mode.
-  - `elasticsearch` as a single-node 8.14.3 container with security disabled.
-- `.env.example` is aligned with Section 14.
-- `README.md` documents only local infrastructure startup/stop/reset commands and pnpm validation commands.
-- The existing pnpm override was moved from `package.json` to `pnpm-workspace.yaml`, which is the pnpm 11-compatible location.
-- No application logic, schemas, producers, Elasticsearch clients, DTOs, controllers, or workers were implemented.
+  - P3 did not modify `docker-compose.yml`.
+- P2B foundation remains present:
+  - `libs/config` provides per-runtime Joi validation.
+  - `libs/observability` provides pino logging setup, correlation ID middleware/context,
+    Prometheus metrics, and Terminus health helpers.
+  - `apps/api` boots with the global `/api` prefix, global validation, 100 KB JSON body
+    limit, global exception filter, health/readiness/metrics, graceful shutdown hooks,
+    and pino logger binding.
+- P3 is complete:
+  - `libs/domain` defines the `Message` model, `MessageCreatedEvent` v1 envelope,
+    repository/transaction ports, and DI tokens.
+  - `libs/persistence` provides Mongoose connection/module wiring, `messages` and
+    `outbox_events` schemas with Section 9 indexes, Mongo repositories, a single-session
+    transaction manager, and Mongo readiness indicator.
+  - `libs/application` provides `CreateMessageService`, `ListMessagesService`, and
+    cursor encode/decode utilities.
+  - `apps/api` provides API-key auth, create/list/search-shape DTOs, standard response
+    mappers, `POST /api/messages`, and `GET /api/conversations/:conversationId/messages`.
+  - Contract tests use `MongoMemoryReplSet`; unit tests cover the transaction helper,
+    create service, cursor utilities, and list service.
 
 ## Remaining
 
-- Section 20 step 6 is next when requested: domain and persistence foundations.
+- P4 is next when requested: messaging lib, outbox publisher worker, Elasticsearch
+  search/indexer path, and search endpoint behavior.
 
 ## Known Issues
 
-- The ambient `pnpm` shim on this machine reports `11.7.0`; validation used the Corepack-cached pnpm 11.1.1 executable directly.
-- `bitnami/kafka` currently has no pullable public tags. Compose uses `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
-- API readiness is a runtime-only placeholder in P2B (`dependencies: []`) because MongoDB and Elasticsearch clients are not implemented yet. Replace it with real dependency indicators when the corresponding modules are added.
+- The ambient `pnpm` shim on this machine reports `11.7.0`; validation used the
+  Corepack-cached pnpm 11.1.1 executable directly.
+- `bitnami/kafka` currently has no pullable public tags. Compose uses
+  `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
+- No separate e2e script exists yet. P3 API contract tests are included in
+  `pnpm run test`.
+- API readiness now checks MongoDB. Elasticsearch readiness is intentionally deferred
+  until P4 adds the search endpoint and ES client.
 
 ## Last Commands
 
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 add -w @nestjs/config joi nestjs-pino pino-http prom-client @nestjs/terminus class-validator class-transformer` - passed using pnpm 11.1.1 after sandbox escalation for the pnpm store.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 add -w express` - passed using pnpm 11.1.1 after sandbox escalation.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 add -Dw @types/express` - passed using pnpm 11.1.1 after sandbox escalation.
-- `pnpm run build` - passed using pnpm 11.1.1.
-- `pnpm run test` - passed using pnpm 11.1.1; 6 test suites and 10 tests passed.
-- `pnpm run lint` - passed using pnpm 11.1.1.
-- `pnpm run start` - passed using pnpm 11.1.1 with temporary env on `PORT=3310`; process was stopped after route verification.
-- `curl -s -i http://127.0.0.1:3310/health/liveness` - passed; returned 200.
-- `curl -s -i http://127.0.0.1:3310/health/readiness` - passed; returned 200.
-- `curl -s http://127.0.0.1:3310/metrics` - passed; returned Prometheus metrics.
-- `pnpm install --config.confirmModulesPurge=false --no-frozen-lockfile` - sandboxed run hit registry DNS failure; approved rerun passed using pnpm 11.1.1 and refreshed the lockfile after moving pnpm overrides.
-- `pnpm run build` - passed using pnpm 11.1.1.
-- `pnpm run test` - passed using pnpm 11.1.1; 4 test suites and 4 tests passed.
-- `pnpm run lint` - passed using pnpm 11.1.1.
-- `docker compose config` - passed.
-- `docker manifest inspect bitnami/kafka:3.7.0` - failed; no such manifest.
-- `docker manifest inspect bitnami/kafka:3.7.1` - failed; no such manifest.
-- `curl -s 'https://hub.docker.com/v2/repositories/bitnami/kafka/tags?page_size=25&name=3.7'` - passed; returned zero tags.
-- `curl -s 'https://hub.docker.com/v2/repositories/bitnamilegacy/kafka/tags?page_size=20&name=3.7'` - passed; showed available 3.7.x tags.
-- `docker manifest inspect bitnamilegacy/kafka:3.7.1-debian-12-r11` - passed.
-- `docker compose up -d mongodb mongodb-init kafka elasticsearch` - initially failed because `27017` was already in use; rerun passed after the port was freed.
-- `nc -vz 127.0.0.1 27017` - passed during the initial failure investigation; confirmed the port was reachable.
-- `docker compose ps` - passed; MongoDB, Kafka, and Elasticsearch were healthy.
-- `docker compose ps -a` - passed; `mongodb-init` exited with code 0 after initializing `rs0`.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @nestjs/mongoose mongoose` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -Dw mongodb-memory-server supertest @types/supertest` - initially exited 1 because pnpm ignored the `mongodb-memory-server` build script pending approval; dependencies were added.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs approve-builds mongodb-memory-server` - passed using pnpm 11.1.1; downloaded MongoDB 8.2.6 for `mongodb-memory-server`.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed during implementation for strict typing; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - initially failed before renaming the e2e spec and fixing the `supertest` import; final rerun passed with 11 test suites and 24 tests.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for test lint cleanup; final rerun passed.
 
 ## Next Step
 
-Proceed to Section 20 step 6: domain and persistence foundations.
+Proceed to P4 only when requested: messaging lib, outbox publisher worker, search lib,
+search-indexer worker, and Elasticsearch-backed search endpoint behavior.

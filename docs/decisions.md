@@ -131,3 +131,19 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Reason: adding real MongoDB/Elasticsearch probes before their clients exist would either duplicate future infrastructure code or create unvalidated placeholder clients.
 - Trade-off: P2B readiness is not yet the final API dependency policy from the implementation plan.
 - Alternatives: add ad hoc raw dependency clients in the API health controller; delay readiness route creation.
+
+### 17. Add MongoDB and contract-test dependencies for P3
+
+- Context: P3 implements the system-of-record write/read path with Mongoose and fast API contract tests against transactional MongoDB.
+- Decision: add `@nestjs/mongoose` and `mongoose` as runtime dependencies, and add `mongodb-memory-server`, `supertest`, and `@types/supertest` as dev dependencies. Approve the `mongodb-memory-server` build script in `pnpm-workspace.yaml`.
+- Reason: Mongoose is the planned persistence adapter, and `MongoMemoryReplSet` gives Docker-free transaction-capable API contract tests.
+- Trade-off: the first install/test run downloads a local MongoDB binary for the memory server.
+- Alternatives: mock persistence in API e2e; require Docker/Testcontainers for every API contract test.
+
+### 18. Scope API readiness to MongoDB until search is implemented
+
+- Context: the implementation plan's final API readiness policy includes MongoDB and Elasticsearch because the complete API contract includes search.
+- Decision: in P3, readiness checks MongoDB only; Elasticsearch readiness is deferred until P4 adds the ES client and search endpoint.
+- Reason: P3 intentionally keeps search behavior out of scope and should not create an unused ES client solely for readiness.
+- Trade-off: P3 readiness is not the final all-dependencies production policy.
+- Alternatives: keep the P2B placeholder; add an ad hoc Elasticsearch probe before search exists.

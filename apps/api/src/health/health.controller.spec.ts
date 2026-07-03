@@ -1,38 +1,21 @@
-import { TestingModule, Test } from '@nestjs/testing';
 import type { Response } from 'express';
 
-const originalEnv = process.env;
-const sha256Hash = 'a'.repeat(64);
+import { createApiTestHarness, type ApiTestHarness } from '../../../../test/e2e/api-test-harness';
 
 describe('Health and metrics controllers', () => {
-  let moduleRef: TestingModule;
+  let harness: ApiTestHarness;
 
-  beforeEach(async () => {
-    jest.resetModules();
-    process.env = {
-      ...originalEnv,
-      API_KEYS: `local:${sha256Hash}`,
-      ELASTICSEARCH_NODE: 'http://localhost:9200',
-      LOG_LEVEL: 'silent',
-      MONGODB_URI: 'mongodb://localhost:27017/message_management?replicaSet=rs0',
-      NODE_ENV: 'test',
-      PORT: '0',
-    };
+  beforeAll(async () => {
+    harness = await createApiTestHarness();
+  }, 60_000);
 
-    const { ApiModule } = await import('../api.module');
-    moduleRef = await Test.createTestingModule({
-      imports: [ApiModule],
-    }).compile();
-  });
-
-  afterEach(async () => {
-    await moduleRef.close();
-    process.env = originalEnv;
+  afterAll(async () => {
+    await harness.close();
   });
 
   it('reports process liveness', async () => {
     const { HealthController } = await import('./health.controller');
-    const healthController = moduleRef.get(HealthController);
+    const healthController = harness.moduleRef.get(HealthController);
 
     const response = await healthController.liveness();
 
@@ -44,9 +27,9 @@ describe('Health and metrics controllers', () => {
     });
   });
 
-  it('reports runtime readiness placeholder', async () => {
+  it('reports runtime and MongoDB readiness', async () => {
     const { HealthController } = await import('./health.controller');
-    const healthController = moduleRef.get(HealthController);
+    const healthController = harness.moduleRef.get(HealthController);
 
     const response = await healthController.readiness();
 
@@ -55,12 +38,15 @@ describe('Health and metrics controllers', () => {
       runtime: {
         status: 'up',
       },
+      mongodb: {
+        status: 'up',
+      },
     });
   });
 
   it('renders prometheus metrics', async () => {
     const { MetricsController } = await import('../metrics/metrics.controller');
-    const metricsController = moduleRef.get(MetricsController);
+    const metricsController = harness.moduleRef.get(MetricsController);
     const response = {
       type: jest.fn(),
     };
