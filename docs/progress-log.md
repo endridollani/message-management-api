@@ -41,3 +41,18 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `pnpm run lint` - passed using pnpm 11.1.1.
 - Open issues: none for this change.
 - Next action: proceed to Section 20 step 4 with pnpm commands only.
+
+## 2026-07-03 - P2A: Local infrastructure and pnpm command consistency
+
+- Scope: added local infrastructure compose services for MongoDB replica set initialization, Kafka in KRaft mode, and Elasticsearch; added `.env.example`; added README infrastructure startup commands; moved the existing pnpm override into `pnpm-workspace.yaml`.
+- Files touched: `docker-compose.yml`, `.env.example`, `README.md`, `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `docs/decisions.md`, `docs/progress-log.md`, and `docs/handoff.md`.
+- Validation:
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 4 test suites and 4 tests passed.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+  - `docker compose config` - passed.
+  - `docker compose up -d mongodb mongodb-init kafka elasticsearch` - initially failed because host port `27017` was already in use; rerun passed after the port was freed.
+  - `docker compose ps` - passed; MongoDB, Kafka, and Elasticsearch were healthy.
+  - `docker compose ps -a` - passed; `mongodb-init` exited with code 0 after initializing `rs0`.
+- Open issues: none for P2A.
+- Next action: proceed to Section 20 step 5.

@@ -99,3 +99,19 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Reason: gives all contributors, agents, scripts, and CI one package-manager contract.
 - Trade-off: Corepack or a compatible pnpm 11.1.1 executable must be available in local and CI environments.
 - Alternatives: continue with npm; allow mixed package managers.
+
+### 13. Use the Bitnami legacy Kafka image for the local KRaft broker
+
+- Context: Section 15 called for `bitnami/kafka:3.7`, but Docker Hub currently exposes no pullable tags for `bitnami/kafka`; exact `3.7.0` and `3.7.1` tags are also unavailable.
+- Decision: pin local compose to `bitnamilegacy/kafka:3.7.1-debian-12-r11` with KRaft mode enabled.
+- Reason: preserves the Bitnami Kafka/KRaft setup using a concrete, pullable 3.7.1 image.
+- Trade-off: the image repository name differs from the original plan and should be revisited if Bitnami restores non-legacy tags.
+- Alternatives: switch to the Apache Kafka image; use a newer Bitnami legacy Kafka version; leave the compose stack unpullable.
+
+### 14. Defer application Dockerfile targets until app services are added to compose
+
+- Context: P2A validation only starts local infrastructure services; application logic, health endpoints, and runtime containers are intentionally out of scope for this slice.
+- Decision: do not add a Dockerfile in P2A.
+- Reason: a multi-stage app Dockerfile cannot be meaningfully validated until app services and health endpoints exist.
+- Trade-off: Section 20 step 4's Dockerfile item remains deferred to the first slice that adds compose-managed app services.
+- Alternatives: add an unused Dockerfile skeleton now; add app services prematurely.
