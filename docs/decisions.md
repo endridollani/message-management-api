@@ -115,3 +115,19 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Reason: a multi-stage app Dockerfile cannot be meaningfully validated until app services and health endpoints exist.
 - Trade-off: Section 20 step 4's Dockerfile item remains deferred to the first slice that adds compose-managed app services.
 - Alternatives: add an unused Dockerfile skeleton now; add app services prematurely.
+
+### 15. Declare Express as a direct dependency for API bootstrap imports
+
+- Context: P2B imports Express runtime APIs and types directly for JSON body limits, response typing, and middleware contracts.
+- Decision: add direct `express` and `@types/express` dependencies instead of relying on `@nestjs/platform-express` transitive dependencies.
+- Reason: pnpm's strict dependency model does not permit application code to import undeclared transitive packages.
+- Trade-off: Express becomes an explicit repo dependency that must stay compatible with the Nest platform adapter.
+- Alternatives: avoid direct Express imports and accept weaker typing/less explicit body-parser setup.
+
+### 16. Keep P2B readiness dependency-free until dependency clients exist
+
+- Context: P2B introduces readiness routes before MongoDB and Elasticsearch modules are implemented.
+- Decision: `/health/readiness` reports runtime readiness with `dependencies: []` in P2B.
+- Reason: adding real MongoDB/Elasticsearch probes before their clients exist would either duplicate future infrastructure code or create unvalidated placeholder clients.
+- Trade-off: P2B readiness is not yet the final API dependency policy from the implementation plan.
+- Alternatives: add ad hoc raw dependency clients in the API health controller; delay readiness route creation.

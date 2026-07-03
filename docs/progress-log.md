@@ -56,3 +56,18 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `docker compose ps -a` - passed; `mongodb-init` exited with code 0 after initializing `rs0`.
 - Open issues: none for P2A.
 - Next action: proceed to Section 20 step 5.
+
+## 2026-07-03 - P2B: Foundation libraries and API runtime bootstrap
+
+- Scope: implemented the `config` lib with per-runtime Joi validation; implemented the `observability` lib with pino logging setup, correlation ID context/middleware, Prometheus metrics skeleton, and Terminus health helper; bootstrapped the API with global validation, 100 KB JSON body limit, global exception filter, graceful shutdown hooks, `/health/liveness`, `/health/readiness`, and `/metrics`.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `apps/api/src/`, `libs/config/src/`, `libs/observability/src/`, `docs/observability.md`, `docs/decisions.md`, `docs/progress-log.md`, and `docs/handoff.md`.
+- Validation:
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 6 test suites and 10 tests passed.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+  - `pnpm run start` - passed using pnpm 11.1.1 with temporary env on `PORT=3310`.
+  - `curl -s -i http://127.0.0.1:3310/health/liveness` - passed; returned 200 `status: ok`.
+  - `curl -s -i http://127.0.0.1:3310/health/readiness` - passed; returned 200 `status: ok` with `dependencies: []`.
+  - `curl -s http://127.0.0.1:3310/metrics` - passed; returned Prometheus metrics including `message_management_process_cpu_user_seconds_total`.
+- Open issues: API readiness is a dependency-free placeholder until MongoDB and Elasticsearch clients are implemented in later slices.
+- Next action: proceed to Section 20 step 6 only when requested.
