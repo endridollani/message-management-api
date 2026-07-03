@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "monorepo": true,
+  "root": "apps/api",
+  "sourceRoot": "apps/api/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": false,
+    "tsConfigPath": "apps/api/tsconfig.app.json"
+  },
+  "projects": {
+    "api": {
+      "type": "application",
+      "root": "apps/api",
+      "entryFile": "main",
+      "sourceRoot": "apps/api/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/api/tsconfig.app.json"
+      }
+    },
+    "outbox-publisher": {
+      "type": "application",
+      "root": "apps/outbox-publisher",
+      "entryFile": "main",
+      "sourceRoot": "apps/outbox-publisher/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/outbox-publisher/tsconfig.app.json"
+      }
+    },
+    "search-indexer": {
+      "type": "application",
+      "root": "apps/search-indexer",
+      "entryFile": "main",
+      "sourceRoot": "apps/search-indexer/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/search-indexer/tsconfig.app.json"
+      }
+    },
+    "cli": {
+      "type": "application",
+      "root": "apps/cli",
+      "entryFile": "main",
+      "sourceRoot": "apps/cli/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/cli/tsconfig.app.json"
+      }
+    },
+    "application": {
+      "type": "library",
+      "root": "libs/application",
+      "entryFile": "index",
+      "sourceRoot": "libs/application/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/application/tsconfig.lib.json"
+      }
+    },
+    "config": {
+      "type": "library",
+      "root": "libs/config",
+      "entryFile": "index",
+      "sourceRoot": "libs/config/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/config/tsconfig.lib.json"
+      }
+    },
+    "domain": {
+      "type": "library",
+      "root": "libs/domain",
+      "entryFile": "index",
+      "sourceRoot": "libs/domain/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/domain/tsconfig.lib.json"
+      }
+    },
+    "messaging": {
+      "type": "library",
+      "root": "libs/messaging",
+      "entryFile": "index",
+      "sourceRoot": "libs/messaging/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/messaging/tsconfig.lib.json"
+      }
+    },
+    "observability": {
+      "type": "library",
+      "root": "libs/observability",
+      "entryFile": "index",
+      "sourceRoot": "libs/observability/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/observability/tsconfig.lib.json"
+      }
+    },
+    "persistence": {
+      "type": "library",
+      "root": "libs/persistence",
+      "entryFile": "index",
+      "sourceRoot": "libs/persistence/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/persistence/tsconfig.lib.json"
+      }
+    },
+    "search": {
+      "type": "library",
+      "root": "libs/search",
+      "entryFile": "index",
+      "sourceRoot": "libs/search/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/search/tsconfig.lib.json"
+      }
+    }
+  }
+}

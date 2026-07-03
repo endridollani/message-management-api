@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@app/application": ["libs/application/src"],
+      "@app/application/*": ["libs/application/src/*"],
+      "@app/config": ["libs/config/src"],
+      "@app/config/*": ["libs/config/src/*"],
+      "@app/domain": ["libs/domain/src"],
+      "@app/domain/*": ["libs/domain/src/*"],
+      "@app/messaging": ["libs/messaging/src"],
+      "@app/messaging/*": ["libs/messaging/src/*"],
+      "@app/observability": ["libs/observability/src"],
+      "@app/observability/*": ["libs/observability/src/*"],
+      "@app/persistence": ["libs/persistence/src"],
+      "@app/persistence/*": ["libs/persistence/src/*"],
+      "@app/search": ["libs/search/src"],
+      "@app/search/*": ["libs/search/src/*"]
+    }
+  },
+  "include": ["apps/**/*.ts", "libs/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
