@@ -29,3 +29,15 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `pnpm run lint` - passed using pnpm 11.1.1.
 - Open issues: the system `pnpm` shim currently resolves to a different runtime binary, so validation used a temporary PATH shim pointed at the Corepack-cached pnpm 11.1.1 executable.
 - Next action: proceed to Section 20 step 4 with pnpm commands only.
+
+## 2026-07-03 - TypeScript 6 baseUrl deprecation cleanup
+
+- Scope: removed the deprecated `compilerOptions.baseUrl` setting and made every `compilerOptions.paths` target explicitly relative to the root `tsconfig.json`.
+- Files touched: `tsconfig.json`, `docs/progress-log.md`, and `docs/handoff.md`.
+- Validation:
+  - `pnpm install --frozen-lockfile` - initial sandboxed install hit registry DNS failures and was interrupted; approved rerun passed using pnpm 11.1.1.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 4 test suites and 4 tests passed.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+- Open issues: none for this change.
+- Next action: proceed to Section 20 step 4 with pnpm commands only.

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-P1 steps 1-3 are complete, and the scaffold has been converted to pnpm 11.1.1 before application implementation continues.
+P1 steps 1-3 are complete, the scaffold has been converted to pnpm 11.1.1, and `tsconfig.json` no longer uses the TypeScript 6-deprecated `baseUrl` option.
 
 ## Complete
 
@@ -13,6 +13,7 @@ P1 steps 1-3 are complete, and the scaffold has been converted to pnpm 11.1.1 be
 - Package manager is pnpm 11.1.1, declared in `package.json`.
 - `pnpm-workspace.yaml` is present for `apps/*` and `libs/*`.
 - Dependencies have been locked in `pnpm-lock.yaml`; npm lock artifacts have been removed.
+- Root TypeScript path aliases are explicitly relative from `tsconfig.json`; `compilerOptions.baseUrl` has been removed.
 - Current validation is green with pnpm 11.1.1.
 
 ## Remaining
@@ -38,6 +39,10 @@ P1 steps 1-3 are complete, and the scaffold has been converted to pnpm 11.1.1 be
 - `pnpm run build` - passed using pnpm 11.1.1.
 - `pnpm run test` - passed using pnpm 11.1.1; 4 test suites and 4 tests passed.
 - `pnpm run lint` - passed using pnpm 11.1.1.
+- `pnpm install --frozen-lockfile` - sandboxed rerun hit registry DNS failure and was interrupted; approved rerun passed using pnpm 11.1.1.
+- `pnpm run build` - passed after removing `baseUrl`.
+- `pnpm run test` - passed after removing `baseUrl`; 4 test suites and 4 tests passed.
+- `pnpm run lint` - passed after removing `baseUrl`.
 
 ## Next Step
 
