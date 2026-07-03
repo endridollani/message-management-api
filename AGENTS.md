@@ -25,6 +25,7 @@ Codex is the primary implementer for this repository: implement scoped slices, r
 
 ## Validation Rules
 
+- Use pnpm 11.1.1 for installs and package scripts; do not create npm or yarn lockfiles.
 - Run lint and unit tests before declaring a step done.
 - Run the integration suite before merging pipeline-touching changes.
 - Never mark work complete with failing checks unless the failure is documented in `docs/handoff.md` with the exact command and reason.

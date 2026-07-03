@@ -87,7 +87,15 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 ### 11. Override transitive multer to a patched release
 
 - Context: the initial Nest scaffold installed `@nestjs/platform-express`, which brought a transitive `multer` version flagged by `npm audit --omit=dev --audit-level=high`.
-- Decision: add a narrow npm `overrides` entry for `multer` at `^2.2.0`.
+- Decision: add a narrow pnpm override for `multer` at `^2.2.0`.
 - Reason: resolves the production audit finding without downgrading Nest or changing the HTTP platform.
 - Trade-off: keep the override under review when `@nestjs/platform-express` updates its own dependency range.
 - Alternatives: downgrade via `npm audit fix --force`; switch away from Express; ignore the audit finding until a later phase.
+
+### 12. Standardize on pnpm 11.1.1
+
+- Context: the scaffold was initially installed with npm artifacts, but the approved package manager is pnpm 11.1.1.
+- Decision: declare `packageManager: pnpm@11.1.1`, commit `pnpm-lock.yaml`, and keep `pnpm-workspace.yaml` for `apps/*` and `libs/*`.
+- Reason: gives all contributors, agents, scripts, and CI one package-manager contract.
+- Trade-off: Corepack or a compatible pnpm 11.1.1 executable must be available in local and CI environments.
+- Alternatives: continue with npm; allow mixed package managers.

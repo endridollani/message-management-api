@@ -15,3 +15,17 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `npm audit --omit=dev --audit-level=high` - passed with network access; found 0 vulnerabilities.
 - Open issues: none yet.
 - Next action: begin Section 20 step 4 only after confirming the next implementation slice.
+
+## 2026-07-03 - Package manager conversion to pnpm
+
+- Scope: converted the scaffold from npm artifacts to pnpm 11.1.1 before continuing application implementation.
+- Files touched: `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `.gitignore`, `AGENTS.md`, `docs/implementation-plan.md`, `docs/decisions.md`, `docs/progress-log.md`, and `docs/handoff.md`; removed `package-lock.json`.
+- Validation:
+  - `corepack enable` - failed in the sandbox with `EPERM` creating `/usr/local/bin/pnpm`; approved rerun also failed with `EACCES`.
+  - `corepack prepare pnpm@11.1.1 --activate` - failed in the sandbox writing the Corepack cache; approved rerun passed.
+  - `pnpm install` - initial sandboxed install hit registry DNS failures and was interrupted; approved rerun passed using pnpm 11.1.1 and created `pnpm-lock.yaml`.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `pnpm run test` - passed using pnpm 11.1.1; 4 test suites and 4 tests passed.
+  - `pnpm run lint` - passed using pnpm 11.1.1.
+- Open issues: the system `pnpm` shim currently resolves to a different runtime binary, so validation used a temporary PATH shim pointed at the Corepack-cached pnpm 11.1.1 executable.
+- Next action: proceed to Section 20 step 4 with pnpm commands only.

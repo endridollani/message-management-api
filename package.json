@@ -4,8 +4,9 @@
   "private": true,
   "description": "Production-grade message management backend scaffold.",
   "license": "UNLICENSED",
+  "packageManager": "pnpm@11.1.1",
   "scripts": {
-    "build": "npm run build:api && npm run build:outbox-publisher && npm run build:search-indexer && npm run build:cli && npm run typecheck",
+    "build": "pnpm run build:api && pnpm run build:outbox-publisher && pnpm run build:search-indexer && pnpm run build:cli && pnpm run typecheck",
     "build:api": "nest build api",
     "build:outbox-publisher": "nest build outbox-publisher",
     "build:search-indexer": "nest build search-indexer",
@@ -33,8 +34,10 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
-  "overrides": {
-    "multer": "^2.2.0"
+  "pnpm": {
+    "overrides": {
+      "multer": "^2.2.0"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
@@ -76,6 +79,5 @@
     "moduleNameMapper": {
       "^@app/(.*)$": "<rootDir>/libs/$1/src"
     }
-  },
-  "packageManager": "pnpm@11.1.1+sha512.d1fdf5f73c617b64fa1a56a81c3c8dfe0e966e33a6010aa256b517ae77be21d93e05affc0de1a83b0e4f29d569f68b446ae8f068cd7247c0bb3df0fb4d7bdf9a"
+  }
 }

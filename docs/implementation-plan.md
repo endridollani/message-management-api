@@ -389,6 +389,8 @@ Global prefix `api` (health/metrics excluded). JSON only; body limit 100 KB. All
 
 `ConfigModule` (global) + typed namespaces; **per-runtime Joi schemas** so each app only requires what it uses. Topic/index/alias/group names are code constants (stable contracts), not env.
 
+**Package manager:** use pnpm 11.1.1 for all installs and scripts. Commit `pnpm-lock.yaml`, keep `pnpm-workspace.yaml` at the repo root, and use pnpm commands in docs, scripts, and CI.
+
 `.env.example`:
 
 ```dotenv
@@ -441,7 +443,7 @@ Validation: URIs/ports checked; `KAFKA_BROKERS` comma-list; `API_KEYS` format-ch
 - **Dockerfile:** multi-stage `node:22-alpine` — deps → build all apps → one slim runtime stage per app target (distinct `CMD`), non-root user, `NODE_ENV=production`.
 - **Startup order:** app services use `depends_on: condition: service_healthy` on their dependencies; additionally each worker retries connections at bootstrap (readiness stays red until connected) — orchestrator-agnostic startup, not compose-order-dependent.
 - Kafka dual listeners (`kafka:9092` internal, `localhost:9094` host) so both compose services and host-run apps work. Topics (main + DLQ, 3 partitions) created idempotently by `MessagingModule` topic-init at worker startup — no reliance on auto-create.
-- Named volumes for mongo/es. README documents both workflows: full `docker compose up --build`, or infra-only + `npm run start:dev <app>` per runtime.
+- Named volumes for mongo/es. README documents both workflows: full `docker compose up --build`, or infra-only + `pnpm run start:dev <app>` per runtime.
 - Graceful shutdown honored end-to-end: `enableShutdownHooks()` in every runtime — api stops accepting connections then closes Mongo/ES; publisher finishes the in-flight batch, releases claims, disconnects producer; indexer `consumer.disconnect()` (commits offsets) then closes ES. Compose `stop_grace_period: 30s`.
 
 ## 16. Documentation and Handoff Plan
@@ -499,7 +501,7 @@ Validation: URIs/ports checked; `KAFKA_BROKERS` comma-list; `API_KEYS` format-ch
 
 **CI (`.github/workflows/ci.yml`) — jobs, all required checks before merge:**
 
-1. `lint` (eslint + prettier check) → 2. `unit` (+ coverage artifact) → 3. `build` (tsc all apps) → 4. `e2e` (contract suite) → 5. `integration` (Testcontainers; runs on the Docker-enabled runner) → 6. `docker-build` (all Dockerfile targets, no push) → 7. `audit` (`npm audit --omit=dev --audit-level=high`, non-blocking warn initially, ratcheted to blocking once baseline is clean — noted in decisions.md). Branch protection: 1–6 required.
+1. `lint` (eslint + prettier check) → 2. `unit` (+ coverage artifact) → 3. `build` (tsc all apps) → 4. `e2e` (contract suite) → 5. `integration` (Testcontainers; runs on the Docker-enabled runner) → 6. `docker-build` (all Dockerfile targets, no push) → 7. `audit` (`pnpm audit --prod --audit-level high`, non-blocking warn initially, ratcheted to blocking once baseline is clean — noted in decisions.md). Branch protection: 1–6 required.
 
 ## 19. README Structure
 
