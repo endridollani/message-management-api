@@ -10,6 +10,6 @@ module.exports = {
   rootDir: path.resolve(__dirname, '../..'),
   testEnvironment: 'node',
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
 };

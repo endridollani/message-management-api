@@ -250,3 +250,31 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   `TimeoutNegativeWarning` and transient coordinator logs during Kafka group
   startup, but assertions are stable and green.
 - Next action: proceed to P7 documentation and ops readiness only when requested.
+
+## 2026-07-03 - Test TypeScript config for Jest globals
+
+- Scope: fixed VS Code/TypeScript Jest global typing for test files without
+  weakening production TypeScript strictness. Added a root `tsconfig.spec.json`
+  for colocated unit specs, e2e tests, integration tests, and test harnesses with
+  `types: ["node", "jest"]`; narrowed the root `tsconfig.json` to production
+  source with Node globals only; pointed `ts-jest` at the spec tsconfig; updated
+  `pnpm run typecheck` to check both production and test projects; and updated
+  ESLint typed parsing to use both TS projects while exposing Jest globals only
+  to spec/test files.
+- Dependency check: `@types/jest` was already installed as a dev dependency, so
+  no package install or lockfile change was needed.
+- Files touched: `tsconfig.json`, `tsconfig.spec.json`, `test/jest/base.config.js`,
+  `eslint.config.mjs`, `package.json`, and docs.
+- Validation, all using pnpm 11.1.1:
+  - `pnpm run typecheck` - passed.
+  - `pnpm run test:unit` - passed; 14 suites and 42 tests passed.
+  - `pnpm run test:e2e` - passed; 3 suites and 12 tests passed.
+  - `pnpm run test:integration` - passed; 1 suite and 10 tests passed, with the
+    known KafkaJS `TimeoutNegativeWarning` and transient coordinator logs.
+  - `pnpm run lint` - initially failed because ESLint typed parsing only saw the
+    production tsconfig after specs were removed from it; final rerun passed after
+    adding `tsconfig.spec.json` to ESLint's project list.
+  - `pnpm run build` - passed.
+- Open issues: the local ambient `pnpm` shim still reports 11.7.0, so validation
+  used the pinned pnpm 11.1.1 executable directly.
+- Next action: proceed to P7 documentation and ops readiness only when requested.

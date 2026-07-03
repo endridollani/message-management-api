@@ -3,12 +3,16 @@
 ## Current Status
 
 P6 is complete: integration verification and CI hardening are implemented.
-The repo now has explicit unit, e2e, integration, and CI test scripts; the
-integration suite runs the production pipeline against disposable MongoDB,
-Kafka, and Elasticsearch Testcontainers; CI defines install, lint, typecheck,
-unit, e2e, integration, build, docker-build, and non-blocking production audit
-jobs. pnpm build/lint/test/test:ci and all Docker targets are green with pnpm
-11.1.1.
+Post-P6 TypeScript/Jest editor tooling is also fixed: test files are covered by
+`tsconfig.spec.json` with Node + Jest globals, production `tsconfig.json` remains
+test-free with Node globals only, `ts-jest` uses the spec tsconfig, and ESLint
+typed parsing knows both TS projects while limiting Jest globals to test files.
+The repo has explicit unit, e2e, integration, and CI test scripts; the integration
+suite runs the production pipeline against disposable MongoDB, Kafka, and
+Elasticsearch Testcontainers; CI defines install, lint, typecheck, unit, e2e,
+integration, build, docker-build, and non-blocking production audit jobs. Latest
+pnpm 11.1.1 validation is green for typecheck, unit, e2e, integration, lint, and
+build.
 
 ## Complete
 
@@ -109,6 +113,14 @@ jobs. pnpm build/lint/test/test:ci and all Docker targets are green with pnpm
     Corepack/pnpm 11.1.1.
   - `Dockerfile` now has `api`, `outbox-publisher`, `search-indexer`, and `cli`
     targets; `.dockerignore` keeps local artifacts out of Docker builds.
+- Test TypeScript tooling is current:
+  - `@types/jest` is already present as a dev dependency.
+  - `tsconfig.spec.json` includes colocated unit specs plus `test/` e2e and
+    integration files with `types: ["node", "jest"]`.
+  - Root production typechecking excludes specs/test harnesses and does not expose
+    Jest globals.
+  - Jest transforms use `tsconfig.spec.json`, and ESLint uses both production and
+    spec TS projects with Jest globals scoped to tests.
 
 ## Remaining
 
@@ -184,6 +196,12 @@ jobs. pnpm build/lint/test/test:ci and all Docker targets are green with pnpm
 - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
 - `docker build --target cli -t message-management-api:cli .` - passed.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs audit --prod --audit-level high` - sandboxed run failed on npm registry DNS; approved network rerun passed with no known vulnerabilities.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed with production and spec tsconfigs.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:unit` - passed; 14 suites and 42 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:e2e` - passed; 3 suites and 12 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed after removing specs from production tsconfig because ESLint only saw the production project; final rerun passed after adding the spec tsconfig to ESLint.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:integration` - passed; 1 suite and 10 tests passed, with the known KafkaJS warning/coordinator noise.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed.
 
 ## Next Step
 

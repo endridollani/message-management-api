@@ -15,10 +15,9 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.jest,
       },
       parserOptions: {
-        projectService: true,
+        project: ['./tsconfig.json', './tsconfig.spec.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -27,5 +26,12 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off'
     },
   },
+  {
+    files: ['**/*.spec.ts', 'test/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
 );
-
