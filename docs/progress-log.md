@@ -212,3 +212,41 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   committing offsets.
 - Next action: proceed to the integration-suite and CI-hardening phase when
   requested.
+
+## 2026-07-03 - P6: Integration suite and CI hardening
+
+- Scope: added explicit `test:unit`, `test:e2e`, `test:integration`, and
+  `test:ci` scripts; split Jest into separate unit/e2e/integration projects;
+  added a Testcontainers integration suite for MongoDB, Kafka, Elasticsearch,
+  outbox publishing, search indexing, DLQ/redrive, HTTP create-to-search, and ES
+  reindex alias swaps; added GitHub Actions CI jobs; added multi-target
+  Dockerfile and `.dockerignore`.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `jest.config.js`, `test/jest/`, `test/integration/`, `.github/workflows/ci.yml`,
+  `Dockerfile`, `.dockerignore`, `README.md`, and docs.
+- Validation:
+  - `pnpm install --frozen-lockfile` with the existing pnpm store - passed using
+    pnpm 11.1.1.
+  - `pnpm run typecheck` - passed.
+  - `pnpm run test:unit` - passed; 14 suites and 42 tests passed.
+  - `pnpm run test:e2e` - passed; 3 suites and 12 tests passed.
+  - `pnpm run test:integration` - initially failed for Kafka hostname, ES
+    wildcard-delete safety, ES disk-watermark allocation, and a hanging Kafka
+    observer helper; final rerun passed with 1 suite and 10 tests.
+  - `pnpm run test` - passed; 17 suites and 54 tests passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run build` - initially failed on a strict KafkaJS handler return type;
+    final rerun passed.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration all green.
+  - `docker build --target api -t message-management-api:api .` - initially
+    failed because the Docker context copied local `node_modules`; final rerun
+    passed after adding `.dockerignore`.
+  - `docker build --target outbox-publisher -t message-management-api:outbox-publisher .` - passed.
+  - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
+  - `docker build --target cli -t message-management-api:cli .` - passed.
+  - `pnpm audit --prod --audit-level high` - sandboxed run failed on registry
+    DNS; approved network rerun passed with no known vulnerabilities.
+- Open issues: integration tests still emit the known local KafkaJS
+  `TimeoutNegativeWarning` and transient coordinator logs during Kafka group
+  startup, but assertions are stable and green.
+- Next action: proceed to P7 documentation and ops readiness only when requested.

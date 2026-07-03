@@ -1,0 +1,9 @@
+.git
+.pnpm-store
+.env
+.env.*
+coverage
+dist
+node_modules
+npm-debug.log
+pnpm-debug.log

@@ -96,3 +96,29 @@ Prefer freeing Docker disk space over leaving this disabled.
 KafkaJS may emit a local Node `TimeoutNegativeWarning` with this single-node
 Kafka setup. If readiness and command output are otherwise healthy, treat it as a
 local runtime warning and continue investigating only if Kafka operations fail.
+
+## Integration Tests
+
+The integration suite uses Testcontainers and starts disposable MongoDB, Kafka,
+and Elasticsearch containers with dynamic host ports:
+
+```bash
+pnpm run test:integration
+```
+
+Run it when changing the create/outbox/Kafka/indexing/search/reindex pipeline.
+It covers transactional write rollback, outbox publishing and retry state,
+indexer idempotency, DLQ behavior, DLQ redrive, HTTP create-to-search, and ES
+reindex alias swaps.
+
+The suite disables Elasticsearch disk allocation thresholds inside its disposable
+container only. This avoids local Docker high-watermark flakes while preserving
+the production/runtime Elasticsearch behavior.
+
+For the full local test gate:
+
+```bash
+pnpm run test:ci
+```
+
+`pnpm run test` remains the fast default and does not run integration tests.

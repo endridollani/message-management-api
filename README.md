@@ -39,3 +39,15 @@ pnpm run build
 pnpm run test
 pnpm run lint
 ```
+
+Testing is split by suite:
+
+```sh
+pnpm run test:unit         # colocated apps/libs specs with mocked I/O
+pnpm run test:e2e          # fast API contract tests with MongoMemoryReplSet
+pnpm run test:integration  # Docker/Testcontainers MongoDB + Kafka + Elasticsearch
+pnpm run test:ci           # unit + e2e + integration
+```
+
+`pnpm run test` runs unit and e2e only. The integration suite is intentionally
+excluded from the default test command because it starts real infrastructure.

@@ -3,7 +3,10 @@ packages:
   - "libs/*"
 
 allowBuilds:
+  cpu-features: false
   mongodb-memory-server: true
+  protobufjs: false
+  ssh2: false
 
 overrides:
   multer: ^2.2.0

@@ -243,3 +243,56 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
   of silently forced to the bootstrap index.
 - Alternatives: always point aliases at the compiled-in physical index during
   startup.
+
+### 26. Split Jest into unit, e2e, and integration projects
+
+- Context: P6 adds slow real-infrastructure tests while preserving the fast
+  inner-loop suite.
+- Decision: keep colocated apps/libs specs in the unit Jest project, keep
+  MongoMemory-backed API contract tests in the e2e project, and put
+  Testcontainers scenarios under `test/integration`. `pnpm run test` runs unit
+  and e2e only; `test:integration` and `test:ci` opt into Docker-backed tests.
+- Reason: integration tests are the right production-pipeline verification, but
+  they should not slow every default test run.
+- Trade-off: CI and merge gates must call the explicit integration command.
+- Alternatives: run all suites through one Jest regex; make integration part of
+  every local `test` invocation.
+
+### 27. Use generic Testcontainers with dynamic host ports for integration
+
+- Context: the existing Compose stack binds fixed local ports for human
+  debugging, which is brittle in CI and parallel local runs.
+- Decision: the integration harness starts MongoDB, Kafka, and Elasticsearch
+  with Testcontainers and dynamic host ports; Kafka is given hostname `kafka` to
+  match its KRaft controller configuration.
+- Reason: isolated disposable infrastructure avoids port conflicts and keeps the
+  tests independent from a developer's compose volumes.
+- Trade-off: the harness owns a small amount of container startup configuration.
+- Alternatives: drive the checked-in Compose file directly; require fixed ports
+  to be free in CI.
+
+### 28. Disable Elasticsearch disk allocation thresholds in disposable tests
+
+- Context: local Docker disk pressure can make a single-node Elasticsearch test
+  container reject shard allocation and time out index creation.
+- Decision: the Testcontainers harness sets
+  `cluster.routing.allocation.disk.threshold_enabled=false` only inside the
+  disposable integration-test Elasticsearch container.
+- Reason: the integration suite should verify application behavior, not fail
+  nondeterministically on local Docker disk watermarks.
+- Trade-off: the test container differs from default ES allocation safety for
+  this one local-only setting.
+- Alternatives: require every developer and CI runner to keep Docker disk usage
+  below the ES high watermark; set the same override in production code.
+
+### 29. Keep CI audit non-blocking initially
+
+- Context: the implementation plan calls for production dependency audit to run
+  in CI, initially warning until the baseline is ratcheted.
+- Decision: `.github/workflows/ci.yml` runs
+  `pnpm audit --prod --audit-level high` with `continue-on-error: true`.
+- Reason: audit visibility is present from P6 without blocking unrelated
+  pipeline checks before a branch-protection policy is finalized.
+- Trade-off: high-severity audit findings must still be reviewed manually until
+  the job is made blocking.
+- Alternatives: make audit blocking immediately; omit audit from CI.

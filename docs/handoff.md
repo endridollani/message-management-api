@@ -2,13 +2,13 @@
 
 ## Current Status
 
-P5 is complete: the maintenance CLI runtime is implemented with
-`outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and `es:reindex`. pnpm
-build/test/lint are green with pnpm 11.1.1. The API supports authenticated
-message creation, cursor-paginated conversation message listing, and
-Elasticsearch-backed conversation search. Transactional outbox publishing,
-Kafka-backed indexing, and safe CLI dry-run commands were manually verified
-locally.
+P6 is complete: integration verification and CI hardening are implemented.
+The repo now has explicit unit, e2e, integration, and CI test scripts; the
+integration suite runs the production pipeline against disposable MongoDB,
+Kafka, and Elasticsearch Testcontainers; CI defines install, lint, typecheck,
+unit, e2e, integration, build, docker-build, and non-blocking production audit
+jobs. pnpm build/lint/test/test:ci and all Docker targets are green with pnpm
+11.1.1.
 
 ## Complete
 
@@ -92,10 +92,27 @@ locally.
     swaps `messages-read`/`messages-write`, and keeps the old index for rollback.
   - `IndexManagerService` no longer moves existing aliases back to `messages-v1`
     during startup, preserving operator-controlled reindex swaps.
+- P6 is complete:
+  - `pnpm run test:unit`, `test:e2e`, `test:integration`, and `test:ci` are
+    explicit package scripts.
+  - `pnpm run test` remains available and runs unit + e2e only; integration is
+    opt-in because it starts Docker infrastructure.
+  - Jest config is split into unit, e2e, and integration projects under
+    `test/jest/`.
+  - `test/integration/message-pipeline.integration.spec.ts` verifies atomic
+    message/outbox writes, transaction rollback, outbox publish-to-Kafka,
+    publish failure retry state, search-indexer indexing, duplicate idempotency,
+    poison-to-DLQ, DLQ redrive, HTTP create-to-search, and `es:reindex` alias
+    swap behavior against real containers.
+  - `.github/workflows/ci.yml` defines install, lint, typecheck, unit, e2e,
+    integration, build, docker-build, and non-blocking audit jobs using
+    Corepack/pnpm 11.1.1.
+  - `Dockerfile` now has `api`, `outbox-publisher`, `search-indexer`, and `cli`
+    targets; `.dockerignore` keeps local artifacts out of Docker builds.
 
 ## Remaining
 
-- Full Testcontainers integration suite and CI hardening remain future phases.
+- P7 documentation and ops readiness remain future work.
 
 ## Known Issues
 
@@ -103,8 +120,6 @@ locally.
   Corepack-cached pnpm 11.1.1 executable directly.
 - `bitnami/kafka` currently has no pullable public tags. Compose uses
   `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
-- No separate e2e script exists yet. P3 API contract tests are included in
-  `pnpm run test`.
 - Host-run local runtimes should use
   `mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true`
   because the local replica set advertises the container hostname internally.
@@ -118,6 +133,9 @@ locally.
 - DLQ dry-run may emit the previously observed local KafkaJS
   `TimeoutNegativeWarning`; the P5 smoke command still completed without
   republishing or committing offsets.
+- The integration suite may emit the same KafkaJS `TimeoutNegativeWarning` plus
+  transient coordinator logs while the single-node Kafka container forms
+  consumer groups. The final P6 runs passed consistently despite this noise.
 
 ## Last Commands
 
@@ -151,9 +169,23 @@ locally.
 - `node dist/apps/cli/apps/cli/src/main.js es:reindex --dry-run` with local host-run env - passed; planned `messages-v2` from `messages-v1`, source count 1, no alias swap.
 - `node dist/apps/cli/apps/cli/src/main.js dlq:redrive --dry-run --limit 1 --idle-timeout-ms 2000` with local host-run env - passed; consumed 0, republished 0, committed 0, stopped on idle timeout.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run start:cli -- outbox:inspect` with local host-run env - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 add -D -w testcontainers` - installed `testcontainers` but exited non-zero until `pnpm-workspace.yaml` build-script decisions were made.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 install --frozen-lockfile` - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed for strict integration-test types; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:unit` - passed; 14 suites and 42 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:e2e` - passed; 3 suites and 12 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:integration` - initially failed while hardening the harness; final rerun passed with 1 suite and 10 tests.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed; 17 suites and 54 tests passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed on one async callback without await; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - initially failed on a strict KafkaJS handler return type; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:ci` - passed; unit, e2e, and integration all green.
+- `docker build --target api -t message-management-api:api .` - initially failed because local `node_modules` entered the Docker context; final rerun passed after adding `.dockerignore`.
+- `docker build --target outbox-publisher -t message-management-api:outbox-publisher .` - passed.
+- `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
+- `docker build --target cli -t message-management-api:cli .` - passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs audit --prod --audit-level high` - sandboxed run failed on npm registry DNS; approved network rerun passed with no known vulnerabilities.
 
 ## Next Step
 
-Proceed to P6 only when requested: Testcontainers integration suite and CI
-hardening. Do not implement Kubernetes, UI, automated DLQ redrive, or schema
-registry.
+Proceed to P7 only when requested: documentation and ops readiness. Do not
+implement Kubernetes, UI, automated DLQ redrive, or schema registry.

@@ -21,10 +21,14 @@
     "start:outbox-publisher": "nest start outbox-publisher",
     "start:search-indexer": "nest start search-indexer",
     "start:cli": "nest start cli",
-    "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test": "jest --config jest.config.js --passWithNoTests",
+    "test:unit": "jest --config test/jest/unit.config.js --passWithNoTests",
+    "test:e2e": "jest --config test/jest/e2e.config.js --passWithNoTests",
+    "test:integration": "jest --config test/jest/integration.config.js --runInBand --detectOpenHandles",
+    "test:ci": "pnpm run test:unit && pnpm run test:e2e && pnpm run test:integration",
+    "test:watch": "jest --config jest.config.js --watch",
+    "test:cov": "jest --config jest.config.js --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --config jest.config.js --runInBand",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -66,32 +70,12 @@
     "prettier": "^3.6.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.2.2",
+    "testcontainers": "^12.0.4",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.1"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": ".",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "apps/**/*.ts",
-      "libs/**/*.ts"
-    ],
-    "coverageDirectory": "./coverage",
-    "testEnvironment": "node",
-    "moduleNameMapper": {
-      "^@app/(.*)$": "<rootDir>/libs/$1/src"
-    }
   }
 }
