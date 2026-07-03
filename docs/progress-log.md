@@ -394,3 +394,45 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
 
 - Fixed GitHub documentation links by replacing local absolute paths with
   relative repo links.
+
+## 2026-07-03 - Swagger/OpenAPI API documentation
+
+- Scope: added API-only Swagger/OpenAPI documentation. The API runtime serves
+  Swagger UI at `/docs` and OpenAPI JSON at `/docs-json`; message endpoints
+  declare the `x-api-key` header security requirement. Added request/response
+  schema decorators for message DTOs and controller decorators for message,
+  health, readiness, and metrics routes. No API endpoint names, fields, auth
+  behavior, validation behavior, worker logic, or CLI logic changed.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+  `apps/api/src/main.ts`, `apps/api/src/swagger.ts`,
+  `apps/api/src/openapi/error-response.dto.ts`, message controllers/DTOs,
+  health and metrics controllers, `test/e2e/api-test-harness.ts`,
+  `test/e2e/openapi.spec.ts`, `README.md`, `docs/api-examples.md`,
+  `docs/security.md`, `docs/decisions.md`, `docs/handoff.md`, and
+  `docs/progress-log.md`.
+- Dependency changes: added `@nestjs/swagger`; did not add
+  `swagger-ui-express` because the installed Nest Swagger package includes
+  `swagger-ui-dist`. Explicitly blocked the transitive `@scarf/scarf` build
+  script with `allowBuilds: false`.
+- Validation, using the pinned pnpm 11.1.1 executable directly:
+  - `pnpm install` - passed.
+  - `pnpm run typecheck` - passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run test:unit` - passed; 14 suites and 43 tests.
+  - `pnpm run test:e2e` - passed; 4 suites and 14 tests.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration suites green with
+    the known local KafkaJS warning/coordinator noise.
+  - `pnpm run build` - passed.
+- Runtime smoke: started the built API on port `3010`; `GET /docs` returned
+  Swagger UI, `GET /docs-json` returned OpenAPI JSON with title/version and
+  `x-api-key` security, unauthenticated `POST /api/messages` still returned
+  `401`, authenticated create/list passed, and create -> outbox -> Kafka ->
+  indexer -> Elasticsearch -> search returned the indexed message after starting
+  the workers. The first search-indexing attempt hit the known local
+  Elasticsearch flood-stage `read_only_allow_delete` block; the documented local
+  disk-watermark remediation was applied and the transient cluster setting was
+  restored after verification.
+- Open issues: none for Swagger/OpenAPI. Local caveats remain for the ambient
+  pnpm shim mismatch, KafkaJS local warning noise, and Docker disk pressure.
+- Next action: run the remote CI workflow on the PR branch if this is being
+  reviewed through GitHub.

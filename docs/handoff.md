@@ -24,6 +24,17 @@ Post-P8 Swagger/OpenAPI polish: the API runtime now serves Swagger UI at
 message, health, readiness, and metrics HTTP endpoints only, and protected
 message operations declare the `x-api-key` header security requirement.
 
+Latest Swagger slice validation used the pinned pnpm 11.1.1 executable directly
+because the ambient `pnpm` shim still reports 11.7.0 locally. `pnpm install`,
+`typecheck`, `lint`, `test:unit`, `test:e2e`, `test:ci`, and `build` all passed.
+Runtime smoke started the built API on port `3010`, verified `/docs` and
+`/docs-json`, confirmed missing `x-api-key` still returns `401`, and confirmed
+create/list/search behavior with the local outbox and indexer workers. The
+search smoke hit the known local Elasticsearch flood-stage
+`read_only_allow_delete` caveat first; the documented local disk-watermark
+remediation was applied and the transient cluster setting was restored after the
+indexed search hit passed.
+
 ## How To Run Locally
 
 Prepare pnpm and dependencies:
