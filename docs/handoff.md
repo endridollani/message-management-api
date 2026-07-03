@@ -2,244 +2,151 @@
 
 ## Current Status
 
-P7 is complete: documentation and ops readiness are current for the implemented
-API, outbox publisher, search indexer, CLI, integration tests, CI, and Docker
-build targets. README now includes a clean-clone quick start, local API key hash
-generation, architecture, runtime apps, Compose infra startup, development mode,
-API endpoints, auth header, test commands, CI checks, Docker build commands, and
-production notes. API examples, observability docs, security docs, and all four
-runbooks now match the implemented behavior. Latest pinned pnpm 11.1.1
-validation is green for typecheck, test:ci, lint, and build; `docker compose
-config` is green.
+P8 is complete. The message-management API is ready for handoff with API,
+outbox-publisher, search-indexer, CLI, tests, CI workflow, Docker targets,
+README, runbooks, observability docs, and security docs in place.
 
-## Complete
+Final validation found one real recovery defect: the search-indexer could miss
+messages published while it was stopped if the consumer group had no committed
+offset for the target partition. The indexer now subscribes with
+`fromBeginning: true`, which is safe because Elasticsearch writes are idempotent
+by message id. Focused unit coverage was added for this behavior, and the
+manual restart smoke passed after the fix.
 
-- P2A infrastructure remains present:
-  - `docker-compose.yml` defines MongoDB replica set initialization, Kafka in KRaft mode, and Elasticsearch.
-  - `.env.example` is aligned with Section 14.
-  - P3 did not modify `docker-compose.yml`.
-- P2B foundation remains present:
-  - `libs/config` provides per-runtime Joi validation.
-  - `libs/observability` provides pino logging setup, correlation ID middleware/context,
-    Prometheus metrics, and Terminus health helpers.
-  - `apps/api` boots with the global `/api` prefix, global validation, 100 KB JSON body
-    limit, global exception filter, health/readiness/metrics, graceful shutdown hooks,
-    and pino logger binding.
-- P3 is complete:
-  - `libs/domain` defines the `Message` model, `MessageCreatedEvent` v1 envelope,
-    repository/transaction ports, and DI tokens.
-  - `libs/persistence` provides Mongoose connection/module wiring, `messages` and
-    `outbox_events` schemas with Section 9 indexes, Mongo repositories, a single-session
-    transaction manager, and Mongo readiness indicator.
-  - `libs/application` provides `CreateMessageService`, `ListMessagesService`, and
-    cursor encode/decode utilities.
-  - `apps/api` provides API-key auth, create/list/search-shape DTOs, standard response
-    mappers, `POST /api/messages`, and `GET /api/conversations/:conversationId/messages`.
-  - Contract tests use `MongoMemoryReplSet`; unit tests cover the transaction helper,
-    create service, cursor utilities, and list service.
-- P4A remains complete:
-  - `libs/messaging` wraps KafkaJS with topic constants, Kafka client lifecycle,
-    topic initialization for `messages.message-created.v1` and
-    `messages.message-created.v1.dlq`, Kafka readiness, and a JSON producer that
-    sends with `acks: -1`.
-  - KafkaJS producer idempotence is intentionally not enabled; correctness remains
-    the outbox at-least-once contract plus downstream idempotency.
-  - `apps/outbox-publisher` exposes health/readiness/metrics on
-    `OUTBOX_HEALTH_PORT` and runs a publisher loop that claims due pending events,
-    reclaims expired publishing leases, publishes with outbox `topic`/`key`/`payload`,
-    marks published with the lock-owner-safe filter, schedules exponential
-    backoff + jitter retries, and marks rows terminal `failed` after max attempts.
-  - Outbox publisher metrics now cover published/failed counters, pending count,
-    oldest pending age, and publish latency.
-  - Unit tests cover claim/publish/mark flow, retry/backoff, max attempts to
-    failed, expired lease reclaim query, lock-owner-safe no-match behavior, topic
-    initialization, and producer `acks: -1`.
-- P4B is complete:
-  - `libs/domain` defines a search port and `SearchUnavailableError`.
-  - `libs/application` provides `SearchMessagesService`.
-  - `libs/search` wires `@nestjs/elasticsearch` to an 8.x Elasticsearch client,
-    defines the strict `messages-v1` mapping, manages `messages-read` and
-    `messages-write` aliases idempotently, exposes ES readiness, indexes through
-    the write alias using `_id = message.id`, and searches through the read alias
-    with a conversation filter and content match.
-  - `apps/search-indexer` consumes `messages.message-created.v1` with consumer
-    group `message-management-api.search-indexer`, validates v1 envelopes,
-    projects only mapped fields, retries retryable ES failures with bounded
-    backoff, publishes malformed/non-retryable/exhausted messages to
-    `messages.message-created.v1.dlq` with error headers, and exposes
-    health/readiness/metrics on `INDEXER_HEALTH_PORT`.
-  - `apps/api` implements
-    `GET /api/conversations/:conversationId/messages/search?q=term`, maps search
-    unavailability to 503, and now includes Elasticsearch read-alias readiness.
-  - Unit and API contract tests cover index manager behavior, ES query DSL/hit
-    mapping, search-indexer happy path, unknown version skip, malformed event to
-    DLQ, retryable/non-retryable ES errors, duplicate idempotent indexing, and API
-    search validation/response/error mapping.
-- P5 is complete:
-  - `apps/cli` uses `nest-commander` and exposes `outbox:inspect`,
-    `outbox:redrive`, `dlq:redrive`, and `es:reindex`.
-  - CLI operation clients are lazy and command-scoped, so Mongo-only commands do
-    not connect Kafka producers or touch Elasticsearch aliases.
-  - `outbox:inspect` reports pending/publishing/published/failed counts, oldest
-    pending age, and a bounded failed-event summary.
-  - `outbox:redrive` defaults to dry-run, requires `--confirm` to update rows,
-    only selects `failed` rows, supports `--id`, `--event-id`, and `--limit`, and
-    never touches `published` rows.
-  - `dlq:redrive` defaults to dry-run, uses the dedicated group
-    `message-management-api.cli.dlq-redrive`, preserves original values and keys
-    when republishing to the main topic, and commits offsets only after confirmed
-    successful republish.
-  - `es:reindex` defaults to dry-run, creates a target versioned index on
-    confirmed runs, reindexes from `messages-read`, verifies counts, atomically
-    swaps `messages-read`/`messages-write`, and keeps the old index for rollback.
-  - `IndexManagerService` no longer moves existing aliases back to `messages-v1`
-    during startup, preserving operator-controlled reindex swaps.
-- P6 is complete:
-  - `pnpm run test:unit`, `test:e2e`, `test:integration`, and `test:ci` are
-    explicit package scripts.
-  - `pnpm run test` remains available and runs unit + e2e only; integration is
-    opt-in because it starts Docker infrastructure.
-  - Jest config is split into unit, e2e, and integration projects under
-    `test/jest/`.
-  - `test/integration/message-pipeline.integration.spec.ts` verifies atomic
-    message/outbox writes, transaction rollback, outbox publish-to-Kafka,
-    publish failure retry state, search-indexer indexing, duplicate idempotency,
-    poison-to-DLQ, DLQ redrive, HTTP create-to-search, and `es:reindex` alias
-    swap behavior against real containers.
-  - `.github/workflows/ci.yml` defines install, lint, typecheck, unit, e2e,
-    integration, build, docker-build, and non-blocking audit jobs using
-    Corepack/pnpm 11.1.1.
-  - `Dockerfile` now has `api`, `outbox-publisher`, `search-indexer`, and `cli`
-    targets; `.dockerignore` keeps local artifacts out of Docker builds.
-- Test TypeScript tooling is current:
-  - `@types/jest` is already present as a dev dependency.
-  - `tsconfig.spec.json` includes colocated unit specs plus `test/` e2e and
-    integration files with `types: ["node", "jest"]`.
-  - Root production typechecking excludes specs/test harnesses and does not expose
-    Jest globals.
-  - Jest transforms use `tsconfig.spec.json`, and ESLint uses both production and
-    spec TS projects with Jest globals scoped to tests.
-- P7 is complete:
-  - `README.md` documents clean-clone setup with pnpm, local dev API key hash
-    generation, architecture, runtime apps, Compose infra startup, host-run
-    development mode, API endpoints, auth header, test commands, CI checks,
-    Docker build targets, and production limitations.
-  - `docs/api-examples.md` covers create, list, search, validation 400, auth
-    401, search unavailable 503, health/readiness, and metrics examples.
-  - `docs/observability.md` matches emitted health routes, readiness policy,
-    correlation ID behavior, log redaction, metric names, and the known KafkaJS
-    warning.
-  - `docs/security.md` matches API-key hashing/comparison behavior, senderId
-    trust, health/metrics exposure policy, secret handling, and key rotation.
-  - Runbooks cover outbox lifecycle/inspection/redrive/stuck-event diagnosis,
-    DLQ inspection/redrive/poison-message handling, ES v1/v2 alias reindex with
-    rollback, and local debugging for Compose, Testcontainers, ES disk
-    watermarks, Kafka listener/coordinator logs, and Mongo/Kafka/ES inspection.
-  - `docs/decisions.md` now includes the known local KafkaJS
-    `TimeoutNegativeWarning` decision in addition to prior implementation
-    decisions.
+## How To Run Locally
 
-## Remaining
+Prepare pnpm and dependencies:
 
-- P8 final validation and final handoff remain future work. Do not start P8
-  unless requested.
+```sh
+corepack enable
+corepack prepare pnpm@11.1.1 --activate
+pnpm install --frozen-lockfile
+```
 
-## Known Issues
+Generate `.env` from `.env.example` with a local API key hash:
 
-- The ambient `pnpm` shim on this machine reports `11.7.0`; validation used the
-  Corepack-cached pnpm 11.1.1 executable directly.
-- `bitnami/kafka` currently has no pullable public tags. Compose uses
-  `bitnamilegacy/kafka:3.7.1-debian-12-r11`; this is recorded in `docs/decisions.md`.
-- Host-run local runtimes should use
+```sh
+DEV_API_KEY='local-dev-key' node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); const key = process.env.DEV_API_KEY; const hash = crypto.createHash("sha256").update(key).digest("hex"); fs.writeFileSync(".env", fs.readFileSync(".env.example", "utf8").replace("local-dev:<sha256-of-dev-key>", `local-dev:${hash}`));'
+```
+
+Start infrastructure:
+
+```sh
+docker compose up -d mongodb mongodb-init kafka elasticsearch
+docker compose ps
+```
+
+Run host processes in separate terminals:
+
+```sh
+pnpm run start:dev
+pnpm run start:outbox-publisher
+pnpm run start:search-indexer
+```
+
+Useful local API checks:
+
+```sh
+curl -s -X POST 'http://localhost:3000/api/messages' \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: local-dev-key' \
+  -d '{"conversationId":"conversation-1","senderId":"sender-1","content":"hello searchable world"}'
+
+curl -s 'http://localhost:3000/api/conversations/conversation-1/messages?limit=10&sortOrder=desc' \
+  -H 'x-api-key: local-dev-key'
+
+curl -s 'http://localhost:3000/api/conversations/conversation-1/messages/search?q=hello&limit=10' \
+  -H 'x-api-key: local-dev-key'
+```
+
+CLI dry-run checks:
+
+```sh
+pnpm run start:cli -- outbox:inspect
+pnpm run start:cli -- outbox:redrive --dry-run
+pnpm run start:cli -- dlq:redrive --dry-run --limit 10 --idle-timeout-ms 5000
+pnpm run start:cli -- es:reindex --dry-run
+```
+
+## How To Validate
+
+Use pnpm 11.1.1:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run lint
+pnpm run test:unit
+pnpm run test:e2e
+pnpm run test:integration
+pnpm run test:ci
+pnpm run build
+docker compose config
+docker build --target api -t message-management-api:api .
+docker build --target outbox-publisher -t message-management-api:outbox-publisher .
+docker build --target search-indexer -t message-management-api:search-indexer .
+docker build --target cli -t message-management-api:cli .
+pnpm audit --prod --audit-level high
+```
+
+P8 ran all commands above successfully with pnpm 11.1.1. The integration suite
+and DLQ dry-run emitted the known local KafkaJS `TimeoutNegativeWarning` and
+transient single-node coordinator logs, but all assertions and commands passed.
+
+## Runtime Smoke Result
+
+Clean local stack smoke passed after `docker compose down -v` and a fresh
+`docker compose up -d mongodb mongodb-init kafka elasticsearch`.
+
+Verified:
+
+- API, outbox-publisher, and search-indexer readiness endpoints returned 200.
+- `POST /api/messages` created a MongoDB message and pending outbox event.
+- List endpoint returned the message from MongoDB.
+- Outbox publisher marked the row `published` and Kafka contained the event.
+- Search-indexer indexed the message into Elasticsearch via `messages-write`.
+- Search endpoint returned the hit from `messages-read`.
+- Outbox publisher restart recovery passed: a message created while the
+  publisher was stopped stayed `pending`, then published and indexed after
+  restart.
+- Search-indexer restart recovery passed after the P8 fix: a message published
+  while the indexer was stopped was indexed and searchable after restart.
+- CLI dry-runs passed for `outbox:inspect`, `outbox:redrive --dry-run`,
+  `dlq:redrive --dry-run`, and `es:reindex --dry-run`.
+
+## Known Local Caveats
+
+- The ambient `pnpm` shim on this machine still reports `11.7.0` after Corepack
+  prepares `11.1.1`. P8 validation used the pinned pnpm 11.1.1 executable
+  directly. Use Corepack/pnpm 11.1.1 in normal environments.
+- Local KafkaJS may emit `TimeoutNegativeWarning` and transient coordinator logs
+  with the single-node broker. Treat this as non-blocking when readiness is
+  green and commands complete.
+- Local Elasticsearch may block allocation when Docker disk usage is above the
+  high watermark or set indices read-only after flood-stage pressure. The local
+  debugging runbook documents the transient smoke-test remediation. P8 restored
+  the transient disk-threshold setting after smoke verification.
+- `bitnamilegacy/kafka:3.7.1-debian-12-r11` is used because the original
+  Bitnami Kafka tags were not pullable during implementation.
+- Host-run local processes require
   `mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true`
-  because the local replica set advertises the container hostname internally.
-- Local Elasticsearch may refuse new shard allocation if Docker disk usage is
-  above the high watermark. During P4B smoke verification this made `messages-v1`
-  red until `cluster.routing.allocation.disk.threshold_enabled=false` was applied
-  transiently and then restored after verification. The local debugging runbook
-  now includes this procedure.
-- Keep `@elastic/elasticsearch` pinned to 8.x while Compose runs Elasticsearch
-  8.14.x; the 9.x client sends incompatible compatibility headers.
-- DLQ dry-run may emit the previously observed local KafkaJS
-  `TimeoutNegativeWarning`; the P5 smoke command still completed without
-  republishing or committing offsets.
-- The integration suite may emit the same KafkaJS `TimeoutNegativeWarning` plus
-  transient coordinator logs while the single-node Kafka container forms
-  consumer groups. The final P6 runs passed consistently despite this noise.
-- During the P7 README smoke check, an existing local Elasticsearch volume had
-  `read_only_allow_delete` set because Docker disk usage previously exceeded the
-  ES flood-stage watermark. Applying the documented local-debugging procedure
-  cleared the block; the transient disk-threshold override was restored after
-  the successful smoke.
-- Running `pnpm run start:cli -- outbox:inspect` with the ambient pnpm 11.7.0
-  shim triggered its supply-chain policy and failed on a minimum-release-age
-  check. Validation used the pinned pnpm 11.1.1 executable directly.
+  because the local replica set advertises the Compose hostname internally.
 
-## Last Commands
+## Production Follow-Ups
 
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w kafkajs` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed for strict test mock casts; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed using pnpm 11.1.1; 14 test suites and 33 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for new-test unbound-method assertions and an unused parameter; final rerun passed.
-- `docker compose up -d mongodb mongodb-init kafka` - passed; MongoDB and Kafka were healthy.
-- Manual P4A publish verification - passed: inserted a pending
-  `manual-p4a-verify-20260703-2` outbox row, started the outbox publisher with
-  host-run `directConnection=true` MongoDB URI on `OUTBOX_HEALTH_PORT=3311`,
-  readiness returned 200, MongoDB row transitioned to `published`, and the event
-  appeared on Kafka topic `messages.message-created.v1`.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @nestjs/elasticsearch @elastic/elasticsearch` - passed using pnpm 11.1.1, but initially installed an incompatible 9.x ES client.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w @elastic/elasticsearch@8.14.0` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed using pnpm 11.1.1; 17 suites and 53 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run format:check` - failed because pre-existing files outside the P4B slice are not Prettier-formatted.
-- `docker compose up -d mongodb mongodb-init kafka elasticsearch` - passed; all infra containers were healthy.
-- Manual P4B create-to-search verification - passed: host-run API on `PORT=3410`, outbox on `OUTBOX_HEALTH_PORT=3411`, and search-indexer on `INDEXER_HEALTH_PORT=3412` all reported readiness; POST created message `6a479ab73d530e785e1b76df`; search returned it from Elasticsearch through the API.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w nest-commander` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed using pnpm 11.1.1.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test --runInBand` - initially failed for CLI test env and alias-bootstrap test expectations; final rerun passed with 17 suites and 54 tests.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for a non-Error Promise rejection in the DLQ service; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
-- `docker compose ps` - passed; MongoDB, Kafka, and Elasticsearch were healthy.
-- `node dist/apps/cli/apps/cli/src/main.js outbox:inspect` with local host-run env - passed; reported 0 pending, 0 publishing, 3 published, 0 failed.
-- `node dist/apps/cli/apps/cli/src/main.js outbox:redrive --dry-run` with local host-run env - passed; matched 0 failed events and reset 0 rows.
-- `node dist/apps/cli/apps/cli/src/main.js es:reindex --dry-run` with local host-run env - passed; planned `messages-v2` from `messages-v1`, source count 1, no alias swap.
-- `node dist/apps/cli/apps/cli/src/main.js dlq:redrive --dry-run --limit 1 --idle-timeout-ms 2000` with local host-run env - passed; consumed 0, republished 0, committed 0, stopped on idle timeout.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run start:cli -- outbox:inspect` with local host-run env - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 add -D -w testcontainers` - installed `testcontainers` but exited non-zero until `pnpm-workspace.yaml` build-script decisions were made.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs --store-dir /Users/apple/Library/pnpm/store/v11 install --frozen-lockfile` - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - initially failed for strict integration-test types; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:unit` - passed; 14 suites and 42 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:e2e` - passed; 3 suites and 12 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:integration` - initially failed while hardening the harness; final rerun passed with 1 suite and 10 tests.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test` - passed; 17 suites and 54 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed on one async callback without await; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - initially failed on a strict KafkaJS handler return type; final rerun passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:ci` - passed; unit, e2e, and integration all green.
-- `docker build --target api -t message-management-api:api .` - initially failed because local `node_modules` entered the Docker context; final rerun passed after adding `.dockerignore`.
-- `docker build --target outbox-publisher -t message-management-api:outbox-publisher .` - passed.
-- `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
-- `docker build --target cli -t message-management-api:cli .` - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs audit --prod --audit-level high` - sandboxed run failed on npm registry DNS; approved network rerun passed with no known vulnerabilities.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed with production and spec tsconfigs.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:unit` - passed; 14 suites and 42 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:e2e` - passed; 3 suites and 12 tests passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed after removing specs from production tsconfig because ESLint only saw the production project; final rerun passed after adding the spec tsconfig to ESLint.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:integration` - passed; 1 suite and 10 tests passed, with the known KafkaJS warning/coordinator noise.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test:ci` - passed; unit, e2e, and integration suites green with the known KafkaJS warning/coordinator noise.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - passed.
-- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed.
-- `docker compose config` - passed.
-- README quick-start smoke against the existing local stack - first create/list
-  passed but search returned empty because Elasticsearch had a local
-  flood-stage read-only block; after applying the documented ES disk-watermark
-  remediation and restoring the transient setting, create/list/search passed.
+- Run MongoDB index creation as a deployment step with production `autoIndex`
+  disabled.
+- Use a production Kafka cluster with replication factor and
+  `min.insync.replicas` configured for `acks=-1`.
+- Provide secured Elasticsearch credentials/TLS and keep the client major
+  aligned with the cluster major.
+- Protect unauthenticated `/health/*` and `/metrics` routes at the gateway,
+  service mesh, or private network boundary.
+- Finalize branch protection and decide whether the CI audit job should become
+  blocking.
+- Add deployment packaging outside this repo if the target platform requires
+  Kubernetes, Helm, or another orchestrator format.
 
 ## Next Step
 
-Proceed to P8 final validation only when requested. Do not implement Kubernetes,
-UI, automated DLQ redrive, schema registry, or new runtime behavior as part of
-P8 unless an actual validation bug requires it.
+No implementation phase remains. Handoff is ready.

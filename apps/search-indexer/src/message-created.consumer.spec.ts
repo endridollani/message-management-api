@@ -49,6 +49,36 @@ describe('MessageCreatedConsumer', () => {
     );
   });
 
+  it('subscribes from the beginning for partitions without committed offsets', async () => {
+    const kafkaConsumer = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+      run: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue(undefined),
+    };
+    const kafka = {
+      consumer: jest.fn().mockReturnValue(kafkaConsumer),
+    };
+    consumer = new MessageCreatedConsumer(
+      kafka as never,
+      search,
+      producer as unknown as KafkaProducerService,
+      metrics as unknown as MetricsService,
+    );
+
+    await consumer.onModuleInit();
+    await consumer.onApplicationShutdown();
+
+    expect(kafkaConsumer.subscribe.mock.calls).toEqual([
+      [
+        {
+          fromBeginning: true,
+          topic: MESSAGE_CREATED_TOPIC,
+        },
+      ],
+    ]);
+  });
+
   it('indexes valid message-created events with only mapped fields', async () => {
     const event = buildEvent();
     const payload = buildPayload(Buffer.from(JSON.stringify({ ...event, extra: 'ignored' })));

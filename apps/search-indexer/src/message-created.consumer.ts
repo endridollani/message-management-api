@@ -49,7 +49,7 @@ export class MessageCreatedConsumer implements OnModuleInit, OnApplicationShutdo
 
     await this.consumer.connect();
     await this.consumer.subscribe({
-      fromBeginning: false,
+      fromBeginning: true,
       topic: MESSAGE_CREATED_TOPIC,
     });
     void this.consumer

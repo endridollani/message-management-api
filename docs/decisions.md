@@ -86,19 +86,19 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 
 ### 11. Override transitive multer to a patched release
 
-- Context: the initial Nest scaffold installed `@nestjs/platform-express`, which brought a transitive `multer` version flagged by `npm audit --omit=dev --audit-level=high`.
+- Context: the initial Nest scaffold installed `@nestjs/platform-express`, which brought a transitive `multer` version flagged by the production dependency audit.
 - Decision: add a narrow pnpm override for `multer` at `^2.2.0`.
 - Reason: resolves the production audit finding without downgrading Nest or changing the HTTP platform.
 - Trade-off: keep the override under review when `@nestjs/platform-express` updates its own dependency range.
-- Alternatives: downgrade via `npm audit fix --force`; switch away from Express; ignore the audit finding until a later phase.
+- Alternatives: force dependency graph changes; switch away from Express; ignore the audit finding until a later phase.
 
 ### 12. Standardize on pnpm 11.1.1
 
-- Context: the scaffold was initially installed with npm artifacts, but the approved package manager is pnpm 11.1.1.
+- Context: the scaffold initially used a different package-manager artifact set, but the approved package manager is pnpm 11.1.1.
 - Decision: declare `packageManager: pnpm@11.1.1`, commit `pnpm-lock.yaml`, and keep `pnpm-workspace.yaml` for `apps/*` and `libs/*`.
 - Reason: gives all contributors, agents, scripts, and CI one package-manager contract.
 - Trade-off: Corepack or a compatible pnpm 11.1.1 executable must be available in local and CI environments.
-- Alternatives: continue with npm; allow mixed package managers.
+- Alternatives: continue with the scaffold default; allow mixed package managers.
 
 ### 13. Use the Bitnami legacy Kafka image for the local KRaft broker
 
@@ -311,3 +311,17 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
   Kafka readiness, publish, or consumer-lag failures.
 - Alternatives: change Kafka image/client versions solely for the warning;
   suppress Node warnings globally; treat the warning as a blocking failure.
+
+### 31. Start the search-indexer from the beginning when offsets are missing
+
+- Context: P8 restart smoke found that a message published while the
+  search-indexer was stopped could land on a partition where the consumer group
+  had no committed offset yet.
+- Decision: subscribe the search-indexer with `fromBeginning: true`.
+- Reason: for partitions without a committed offset, the indexer must replay
+  existing records instead of starting at the latest offset and missing durable
+  Kafka messages. Elasticsearch indexing is idempotent by message id, so replay
+  is safe.
+- Trade-off: a brand-new search-indexer group can replay existing topic history.
+- Alternatives: keep latest-offset startup and rely on reindex/backfill after
+  missed messages; manually seed offsets for every partition before traffic.

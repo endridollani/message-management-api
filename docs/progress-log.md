@@ -315,3 +315,58 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   documented disk-watermark remediation if Docker disk remains high.
 - Next action: P7 is complete. Proceed to P8 final validation and handoff only
   when requested.
+
+## 2026-07-03 - P8: Final validation and handoff
+
+- Scope: completed final clean-slate validation, runtime smoke, documentation
+  consistency checks, and final handoff. P8 found and fixed one real recovery
+  defect: the search-indexer now subscribes with `fromBeginning: true` so it does
+  not miss messages published while stopped on partitions without committed
+  offsets. Elasticsearch indexing remains idempotent by message id.
+- Files touched: `apps/search-indexer/src/message-created.consumer.ts`,
+  `apps/search-indexer/src/message-created.consumer.spec.ts`,
+  `docs/decisions.md`, `docs/handoff.md`, and `docs/progress-log.md`.
+- Validation, using pnpm 11.1.1 where pnpm was used:
+  - `corepack prepare pnpm@11.1.1 --activate` - passed, but the ambient shim
+    still reported 11.7.0; validation used the pinned 11.1.1 executable.
+  - `pnpm install --frozen-lockfile` - passed.
+  - `pnpm run typecheck` - passed after the P8 fix.
+  - `pnpm run lint` - passed after the P8 fix.
+  - `pnpm run test:unit` - passed after the P8 fix; 14 suites and 43 tests.
+  - `pnpm run test:e2e` - passed after the P8 fix; 3 suites and 12 tests.
+  - `pnpm run test:integration` - passed after the P8 fix; 1 suite and 10 tests.
+  - `pnpm run test:ci` - passed after the P8 fix; unit, e2e, and integration
+    all green.
+  - `pnpm run build` - passed after the P8 fix.
+  - `docker compose config` - passed.
+  - `docker build --target api -t message-management-api:api .` - passed after
+    the P8 fix.
+  - `docker build --target outbox-publisher -t message-management-api:outbox-publisher .` - passed after the P8 fix.
+  - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed after the P8 fix.
+  - `docker build --target cli -t message-management-api:cli .` - passed after
+    the P8 fix.
+  - `pnpm audit --prod --audit-level high` - passed with no known
+    vulnerabilities.
+- Runtime smoke:
+  - `docker compose down -v` followed by
+    `docker compose up -d mongodb mongodb-init kafka elasticsearch` passed.
+  - MongoDB, Kafka, and Elasticsearch became healthy; `mongodb-init` exited 0.
+  - API, outbox-publisher, and search-indexer readiness endpoints returned 200.
+  - Create/list/outbox publish/ES document/search endpoint smoke passed.
+  - Outbox publisher restart recovery passed.
+  - Search-indexer restart recovery initially failed, exposed the missing-offset
+    defect, then passed after the fix and rebuild.
+  - CLI dry-runs passed for `outbox:inspect`, `outbox:redrive --dry-run`,
+    `dlq:redrive --dry-run --limit 10 --idle-timeout-ms 2000`, and
+    `es:reindex --dry-run`.
+- Documentation consistency:
+  - README commands match current `package.json` scripts.
+  - Non-historical docs are pnpm-based.
+  - Endpoint names, env vars, health routes, metrics routes, CLI commands, Kafka
+    topics, Elasticsearch aliases, and Docker targets match implementation.
+  - Known local caveats are documented in handoff/runbooks.
+- Open issues: local caveats remain for the ambient pnpm shim mismatch, KafkaJS
+  `TimeoutNegativeWarning`, and Docker disk pressure causing Elasticsearch
+  high-watermark or flood-stage behavior. P8 restored the transient
+  Elasticsearch disk-threshold setting after smoke verification.
+- Next action: no implementation phase remains; project is ready for handoff.
