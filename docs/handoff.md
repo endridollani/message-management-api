@@ -45,6 +45,12 @@ required env vars are missing. `start:prod` now points at the emitted API path
 used by Docker, and ordering docs now describe per-conversation partition
 affinity rather than strict ordering across retries.
 
+Post-P8 local Git hook setup added Husky and lint-staged as dev dependencies.
+The local `pre-commit` hook runs staged-file formatting/linting through
+lint-staged only, and the local `pre-push` hook runs `typecheck`, `lint`,
+`test:unit`, and `build`. The hooks intentionally do not run integration tests,
+Docker builds, audits, or the full CI pipeline. CI remains the source of truth.
+
 ## How To Run Locally
 
 Prepare pnpm and dependencies:
@@ -130,6 +136,11 @@ the local Node 26/Corepack combination. `typecheck`, `lint`, `test:unit`,
 and Docker builds for the `api` and `search-indexer` targets passed. The
 integration suite emitted the known local KafkaJS `TimeoutNegativeWarning` and
 transient single-node coordinator logs, but all assertions passed.
+
+Latest local-hook validation also used the cached pnpm 11.1.1 executable
+directly. `pnpm install`, `typecheck`, `lint`, `test:unit`, `test:ci`, and
+`build` passed. Manual hook checks passed: `pre-commit` invoked lint-staged, and
+`pre-push` ran only `typecheck`, `lint`, `test:unit`, and `build`.
 
 ## Runtime Smoke Result
 

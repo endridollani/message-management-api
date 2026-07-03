@@ -463,8 +463,7 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
 - Runtime smoke: with MongoDB healthy and Elasticsearch stopped, the built API
   booted on port `3310`, liveness returned 200, readiness returned 503 with
-  Elasticsearch down, create/list worked against MongoDB, and search returned
-  503. Elasticsearch was restarted afterward.
+  Elasticsearch down, create/list worked against MongoDB, and search returned 503. Elasticsearch was restarted afterward.
 - Open issues: ambient `pnpm` still reports 11.7.0 and `corepack pnpm` currently
   fails locally under Node 26, so validation used the cached pnpm 11.1.1 binary
   directly. No follow-up remains for the Claude review findings.
@@ -495,3 +494,28 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
     same known KafkaJS warning/coordinator noise.
   - `pnpm run build` - passed.
 - Open issues: none.
+
+## 2026-07-03 - Added lightweight local Git hooks
+
+- Scope: added Husky and lint-staged for local developer guardrails without
+  changing backend runtime behavior or duplicating full CI locally. `pre-commit`
+  runs lint-staged against staged files only. `pre-push` runs typecheck, lint,
+  unit tests, and build only.
+- Files touched: `.husky/pre-commit`, `.husky/pre-push`, `package.json`,
+  `pnpm-lock.yaml`, `README.md`, `docs/handoff.md`, and `docs/progress-log.md`.
+- Validation, using the cached pnpm 11.1.1 executable directly:
+  - `pnpm install` - passed.
+  - `pnpm run typecheck` - passed.
+  - `pnpm run lint` - passed.
+  - `pnpm run test:unit` - passed; 16 suites and 52 tests.
+  - `pnpm run test:ci` - passed; unit, e2e, and integration all green, with the
+    known local KafkaJS warning/coordinator noise.
+  - `pnpm run build` - passed.
+- Manual hook verification:
+  - `pre-commit` invoked `pnpm exec lint-staged` and exited cleanly with no
+    staged files.
+  - `pre-push` ran `typecheck`, `lint`, `test:unit`, and `build`; it did not run
+    integration tests, Docker builds, audit, or `test:ci`.
+- Open issues: ambient `pnpm` still reports 11.7.0 and `corepack pnpm` still
+  fails locally under Node 26, so validation placed the cached pnpm 11.1.1
+  executable first on `PATH` for manual hook checks.

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+pnpm run typecheck
+pnpm run lint
+pnpm run test:unit
+pnpm run build

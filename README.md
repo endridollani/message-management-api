@@ -51,6 +51,22 @@ corepack prepare pnpm@11.1.1 --activate
 pnpm install --frozen-lockfile
 ```
 
+## Local Git Hooks
+
+This repo uses Husky for lightweight local Git guardrails. The local hooks are
+developer-friendly checks; CI remains the source of truth before merge.
+
+- `pre-commit` runs `lint-staged` against staged files only.
+- `pre-push` runs `pnpm run typecheck`, `pnpm run lint`,
+  `pnpm run test:unit`, and `pnpm run build`.
+
+Bypass hooks only in exceptional cases:
+
+```sh
+git commit --no-verify
+git push --no-verify
+```
+
 ## Quick Start
 
 Generate a local development API key hash and write `.env` from the example:
