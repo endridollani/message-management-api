@@ -114,4 +114,4 @@ is no longer required.
 - Count mismatch: do not swap aliases manually; inspect `_reindex` failures and
   source/target queries.
 - Red/yellow local shards: check Docker disk watermarks in
-  [local-debugging.md](/Users/apple/Desktop/message-management-api/docs/runbooks/local-debugging.md).
+  [local-debugging.md](local-debugging.md).

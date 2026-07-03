@@ -8,6 +8,7 @@ import { Logger } from 'nestjs-pino';
 
 import { ApiModule } from './api.module';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { setupSwagger } from './swagger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(ApiModule, {
@@ -41,6 +42,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.enableShutdownHooks();
+  setupSwagger(app);
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') ?? 3000;

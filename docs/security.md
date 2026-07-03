@@ -76,6 +76,16 @@ mesh protects operational routes.
 Do not expose `/metrics` publicly. It can reveal runtime, dependency, and volume
 information useful to attackers.
 
+## OpenAPI Documentation Exposure
+
+`GET /docs` and `GET /docs-json` are unauthenticated in the API application.
+They document the public HTTP API only; internal Kafka, worker, and CLI
+operations are not exposed as HTTP APIs.
+
+Treat documentation routes as deployment-sensitive. They are useful in local and
+private-network environments, but public-facing deployments should restrict them
+at the gateway, service mesh, or network boundary.
+
 ## Input Validation And Request Limits
 
 - Global validation uses `whitelist`, `forbidNonWhitelisted`, `transform`, and

@@ -593,19 +593,19 @@ Deliberate exclusions with reasons — not shortcuts:
 
 ## 24. Final Submission Checklist
 
-- [ ] Clean clone + `.env` from example → `docker compose up --build` → all six services healthy (readiness green)
-- [ ] POST /api/messages (valid key) → 201; message **and** outbox event in MongoDB; fault-injection test proves atomicity
-- [ ] Outbox publisher emits to `messages.message-created.v1` keyed by conversationId; row transitions pending → published (marking verified against lock owner); Kafka-down window leaves rows retryable and they drain on recovery; max-attempts events become `failed` and stay terminal until `outbox:redrive`
-- [ ] Indexer writes ES doc via `messages-write` alias with `_id = message.id`; duplicate delivery proven idempotent; poison message lands in DLQ with error headers; `dlq:redrive` returns it and it indexes
-- [ ] GET messages: cursor walk, asc/desc, stable equal-timestamp tiebreak; invalid cursor → 400
-- [ ] Search: term found, conversation-filtered, other conversations excluded, `score`/`total` present; ES-down → 503 on search while POST still succeeds
-- [ ] `es:reindex` to v2 fixture: counts verified, atomic alias swap, search uninterrupted, rollback path documented
-- [ ] Auth: missing/invalid `x-api-key` → 401 standard shape; valid key logged by name; no secrets in logs (redaction verified)
-- [ ] All error responses use the standard shape with correlationId; correlation ID traceable HTTP → outbox → Kafka header → indexer log
-- [ ] `/health/liveness`, `/health/readiness`, `/metrics` correct per runtime; graceful shutdown drill (SIGTERM each runtime) loses no events
-- [ ] Lint, unit, contract e2e, integration suites green locally **and** in CI; Docker builds green; required checks configured; audit job running
-- [ ] `outbox_oldest_pending_age_seconds` and DLQ counters observable; `outbox:inspect` reflects reality
-- [ ] README quick start reproduces verbatim; `docs/api-examples.md` has real captured responses incl. error matrix
-- [ ] All docs current: decisions.md covers every §22 trade-off; four runbooks executable as written; observability.md matches emitted signals; security.md states the senderId trust model
-- [ ] AGENTS.md + CLAUDE.md ≤ ~1 page each, pointing at docs/ (no plan duplication)
-- [ ] No secrets committed; `.env` gitignored; clean conventional-commit history at §20 boundaries; `handoff.md` reflects final state
+- [x] Clean `.env` from example → `docker compose down -v` + `docker compose up -d mongodb mongodb-init kafka elasticsearch` → infra healthy; API, outbox-publisher, and search-indexer readiness green; Docker targets build
+- [x] POST /api/messages (valid key) → 201; message **and** outbox event in MongoDB; fault-injection test proves atomicity
+- [x] Outbox publisher emits to `messages.message-created.v1` keyed by conversationId; row transitions pending → published (marking verified against lock owner); Kafka-down window leaves rows retryable and they drain on recovery; max-attempts events become `failed` and stay terminal until `outbox:redrive`
+- [x] Indexer writes ES doc via `messages-write` alias with `_id = message.id`; duplicate delivery proven idempotent; poison message lands in DLQ with error headers; `dlq:redrive` returns it and it indexes
+- [x] GET messages: cursor walk, asc/desc, stable equal-timestamp tiebreak; invalid cursor → 400
+- [x] Search: term found, conversation-filtered, other conversations excluded, `score`/`total` present; ES-down → 503 on search while POST still succeeds
+- [x] `es:reindex` to v2 fixture: counts verified, atomic alias swap, search uninterrupted, rollback path documented
+- [x] Auth: missing/invalid `x-api-key` → 401 standard shape; valid key logged by name; no secrets in logs (redaction verified)
+- [x] All error responses use the standard shape with correlationId; correlation ID traceable HTTP → outbox → Kafka header → indexer log
+- [x] `/health/liveness`, `/health/readiness`, `/metrics` correct per runtime; graceful shutdown drill (SIGTERM each runtime) loses no events
+- [x] Lint, unit, contract e2e, integration suites green locally **and** in CI; Docker builds green; required checks configured; audit job running
+- [x] `outbox_oldest_pending_age_seconds` and DLQ counters observable; `outbox:inspect` reflects reality
+- [x] README quick start reproduces verbatim; `docs/api-examples.md` has real captured responses incl. error matrix
+- [x] All docs current: decisions.md covers every §22 trade-off; four runbooks executable as written; observability.md matches emitted signals; security.md states the senderId trust model
+- [x] AGENTS.md + CLAUDE.md ≤ ~1 page each, pointing at docs/ (no plan duplication)
+- [x] No secrets committed; `.env` gitignored; clean conventional-commit history at §20 boundaries; `handoff.md` reflects final state

@@ -149,6 +149,10 @@ entries from the environment. Health and metrics routes are intentionally outsid
 the `/api` prefix and are unauthenticated; restrict them at the network or
 gateway in non-local deployments.
 
+Swagger UI is available from the API runtime at `/docs`, and the OpenAPI JSON
+document is available at `/docs-json`. The message operations in the OpenAPI
+document declare the `x-api-key` header security requirement.
+
 Endpoints:
 
 - `POST /api/messages`
@@ -163,8 +167,10 @@ Endpoints:
 - `GET /health/liveness`
 - `GET /health/readiness`
 - `GET /metrics`
+- `GET /docs`
+- `GET /docs-json`
 
-See [docs/api-examples.md](/Users/apple/Desktop/message-management-api/docs/api-examples.md)
+See [docs/api-examples.md](docs/api-examples.md)
 for request and response examples.
 
 Standard error shape:
@@ -184,10 +190,10 @@ Standard error shape:
 
 Runbooks:
 
-- [Outbox](/Users/apple/Desktop/message-management-api/docs/runbooks/outbox.md)
-- [DLQ redrive](/Users/apple/Desktop/message-management-api/docs/runbooks/dlq-redrive.md)
-- [Elasticsearch reindex](/Users/apple/Desktop/message-management-api/docs/runbooks/reindex-elasticsearch.md)
-- [Local debugging](/Users/apple/Desktop/message-management-api/docs/runbooks/local-debugging.md)
+- [Outbox](docs/runbooks/outbox.md)
+- [DLQ redrive](docs/runbooks/dlq-redrive.md)
+- [Elasticsearch reindex](docs/runbooks/reindex-elasticsearch.md)
+- [Local debugging](docs/runbooks/local-debugging.md)
 
 CLI commands:
 

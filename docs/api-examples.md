@@ -6,6 +6,24 @@ timestamps, scores, and correlation IDs vary by run.
 All message endpoints require `x-api-key`. The local examples assume `.env`
 contains `API_KEYS=local-dev:<sha256(local-dev-key)>`.
 
+## OpenAPI Documentation
+
+Swagger UI is served by the API runtime:
+
+```sh
+open 'http://localhost:3000/docs'
+```
+
+The OpenAPI JSON document is available at:
+
+```sh
+curl -s 'http://localhost:3000/docs-json' | jq '.info'
+```
+
+The message endpoints in the generated document include the `x-api-key` header
+security requirement. Health, metrics, and documentation routes are
+unauthenticated in the application.
+
 ## POST /api/messages
 
 ```sh

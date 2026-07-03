@@ -3,6 +3,7 @@ packages:
   - "libs/*"
 
 allowBuilds:
+  '@scarf/scarf': false
   cpu-features: false
   mongodb-memory-server: true
   protobufjs: false

@@ -13,6 +13,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createHash } from 'node:crypto';
 
 import { AllExceptionsFilter } from '../../apps/api/src/filters/all-exceptions.filter';
+import { setupSwagger } from '../../apps/api/src/swagger';
 
 export const VALID_API_KEY = 'valid-api-key';
 const API_KEY_HASH = createHash('sha256').update(VALID_API_KEY).digest('hex');
@@ -102,6 +103,7 @@ export async function createApiTestHarness(): Promise<ApiTestHarness> {
   app.useGlobalFilters(
     new AllExceptionsFilter(app.get(HttpAdapterHost), app.get(CorrelationIdContext)),
   );
+  setupSwagger(app);
 
   await app.init();
 

@@ -258,6 +258,20 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
 - Alternatives: run all suites through one Jest regex; make integration part of
   every local `test` invocation.
 
+### 27. Use @nestjs/swagger for API-only OpenAPI documentation
+
+- Context: the implemented API contract is stable after P8 and needs generated
+  documentation without changing runtime behavior.
+- Decision: add `@nestjs/swagger` to the API app only, serve Swagger UI at
+  `/docs`, and serve OpenAPI JSON at `/docs-json`.
+- Reason: it integrates with the existing Nest controllers and DTOs, documents
+  the `x-api-key` header requirement for protected endpoints, and avoids
+  hand-maintaining a separate OpenAPI file.
+- Trade-off: the transitive Swagger UI package includes `@scarf/scarf`, whose
+  install build script is explicitly blocked in `pnpm-workspace.yaml`.
+- Alternatives: maintain static OpenAPI JSON manually; keep only
+  `docs/api-examples.md` as the API reference.
+
 ### 27. Use generic Testcontainers with dynamic host ports for integration
 
 - Context: the existing Compose stack binds fixed local ports for human

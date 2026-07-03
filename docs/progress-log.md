@@ -389,3 +389,8 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   - `pnpm run build` - passed.
 - Open issues: none for the CI setup fix.
 - Next action: rerun the GitHub Actions workflow on the PR branch.
+
+## 2026-07-03 - Documentation link cleanup
+
+- Fixed GitHub documentation links by replacing local absolute paths with
+  relative repo links.

@@ -19,6 +19,11 @@ offset for the target partition. The indexer now subscribes with
 by message id. Focused unit coverage was added for this behavior, and the
 manual restart smoke passed after the fix.
 
+Post-P8 Swagger/OpenAPI polish: the API runtime now serves Swagger UI at
+`/docs` and OpenAPI JSON at `/docs-json`. The generated document covers the
+message, health, readiness, and metrics HTTP endpoints only, and protected
+message operations declare the `x-api-key` header security requirement.
+
 ## How To Run Locally
 
 Prepare pnpm and dependencies:
@@ -63,6 +68,8 @@ curl -s 'http://localhost:3000/api/conversations/conversation-1/messages?limit=1
 
 curl -s 'http://localhost:3000/api/conversations/conversation-1/messages/search?q=hello&limit=10' \
   -H 'x-api-key: local-dev-key'
+
+curl -s 'http://localhost:3000/docs-json' | jq '.info'
 ```
 
 CLI dry-run checks:
@@ -147,7 +154,9 @@ Verified:
 - Provide secured Elasticsearch credentials/TLS and keep the client major
   aligned with the cluster major.
 - Protect unauthenticated `/health/*` and `/metrics` routes at the gateway,
-  service mesh, or private network boundary.
+  service mesh, or private network boundary. Apply the same exposure decision to
+  `/docs` and `/docs-json` if documentation routes are enabled in a public-facing
+  deployment.
 - Finalize branch protection and decide whether the CI audit job should become
   blocking.
 - Add deployment packaging outside this repo if the target platform requires
