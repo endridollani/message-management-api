@@ -203,3 +203,43 @@ This file is the ADR-lite log for durable technical decisions. Record decisions 
   client major together.
 - Alternatives: upgrade the Compose Elasticsearch image to 9.x; override client
   compatibility headers manually.
+
+### 23. Make maintenance CLI mutations opt-in with `--confirm`
+
+- Context: P5 adds operator commands that can mutate outbox rows, republish DLQ
+  records, and swap Elasticsearch aliases.
+- Decision: state-changing CLI commands default to dry-run behavior and require
+  `--confirm` before applying changes. `outbox:redrive --confirm` also requires
+  an explicit selector or `--limit`.
+- Reason: failed outbox rows and DLQ records can be poison messages; accidental
+  bulk redrive is more dangerous than an extra explicit flag.
+- Trade-off: routine operator commands are slightly more verbose.
+- Alternatives: prompt interactively; mutate by default with only a `--dry-run`
+  escape hatch.
+
+### 24. Keep CLI clients lazy and command-scoped
+
+- Context: Importing worker modules into the CLI would connect Kafka producers
+  and initialize Elasticsearch aliases even for Mongo-only commands.
+- Decision: CLI services construct MongoDB, Kafka, and Elasticsearch clients only
+  inside the commands that need them.
+- Reason: `outbox:inspect` should not require Kafka producer startup or touch
+  Elasticsearch aliases, and `es:reindex --dry-run` should not initialize worker
+  side effects.
+- Trade-off: the CLI has small operational client wrappers instead of only using
+  Nest module providers.
+- Alternatives: import `PersistenceModule`, `MessagingModule`, and `SearchModule`
+  globally into `CliModule`.
+
+### 25. Do not move existing Elasticsearch aliases during startup bootstrap
+
+- Context: P5 reindexing can move `messages-read` and `messages-write` to a new
+  physical index while older code still knows about `messages-v1`.
+- Decision: `IndexManagerService` creates missing aliases but does not overwrite
+  aliases that already exist.
+- Reason: runtime startup must not undo an operator-controlled reindex alias
+  swap.
+- Trade-off: alias repair after a bad manual migration must be explicit instead
+  of silently forced to the bootstrap index.
+- Alternatives: always point aliases at the compiled-in physical index during
+  startup.

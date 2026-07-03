@@ -47,23 +47,40 @@ export class IndexManagerService implements OnModuleInit {
   }
 
   private async ensureAliases(): Promise<void> {
-    await this.elasticsearch.indices.updateAliases({
-      actions: [
-        {
-          add: {
-            alias: MESSAGES_READ_ALIAS,
-            index: MESSAGES_PHYSICAL_INDEX,
-          },
-        },
-        {
-          add: {
-            alias: MESSAGES_WRITE_ALIAS,
-            index: MESSAGES_PHYSICAL_INDEX,
-            is_write_index: true,
-          },
-        },
-      ],
-    });
+    const [readAliasExists, writeAliasExists] = await Promise.all([
+      this.elasticsearch.indices.existsAlias({ name: MESSAGES_READ_ALIAS }),
+      this.elasticsearch.indices.existsAlias({ name: MESSAGES_WRITE_ALIAS }),
+    ]);
+
+    const actions = [
+      ...(readAliasExists
+        ? []
+        : [
+            {
+              add: {
+                alias: MESSAGES_READ_ALIAS,
+                index: MESSAGES_PHYSICAL_INDEX,
+              },
+            },
+          ]),
+      ...(writeAliasExists
+        ? []
+        : [
+            {
+              add: {
+                alias: MESSAGES_WRITE_ALIAS,
+                index: MESSAGES_PHYSICAL_INDEX,
+                is_write_index: true,
+              },
+            },
+          ]),
+    ];
+
+    if (actions.length === 0) {
+      return;
+    }
+
+    await this.elasticsearch.indices.updateAliases({ actions });
   }
 }
 

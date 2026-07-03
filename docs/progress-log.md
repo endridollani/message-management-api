@@ -179,3 +179,36 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
   threshold allowed the smoke test, and the setting was restored afterward.
 - Next action: proceed to the CLI slice only when requested:
   `outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and `es:reindex`.
+
+## 2026-07-03 - P5: Maintenance CLI commands
+
+- Scope: implemented the nest-commander CLI runtime with `outbox:inspect`,
+  `outbox:redrive`, `dlq:redrive`, and `es:reindex`. CLI mutation commands default
+  to dry-run unless `--confirm` is supplied. Outbox redrive only selects
+  `failed` rows and never updates `published` rows. DLQ redrive uses the
+  dedicated group `message-management-api.cli.dlq-redrive`, republishes original
+  values to `messages.message-created.v1` with the original key when present, and
+  does not commit offsets during dry-run. ES reindex creates a target versioned
+  index, reindexes from `messages-read`, verifies counts, atomically swaps
+  `messages-read`/`messages-write`, and keeps the previous index for rollback.
+- Files touched: `package.json`, `pnpm-lock.yaml`, `apps/cli/src/`,
+  `libs/search/src/index-manager.service.ts`,
+  `libs/search/src/index-manager.service.spec.ts`, and docs.
+- Validation:
+  - `pnpm add -w nest-commander` - passed using pnpm 11.1.1.
+  - `pnpm run typecheck` - passed using pnpm 11.1.1.
+  - `pnpm run test --runInBand` - initially failed for CLI test env and updated
+    alias-bootstrap expectations; final rerun passed with 17 suites and 54 tests.
+  - `pnpm run lint` - initially failed for a non-Error Promise rejection in the
+    DLQ service; final rerun passed.
+  - `pnpm run build` - passed using pnpm 11.1.1.
+  - `docker compose ps` - passed; MongoDB, Kafka, and Elasticsearch were healthy.
+  - Compiled CLI smoke checks passed against the local stack:
+    `outbox:inspect`, `outbox:redrive --dry-run`, `es:reindex --dry-run`, and
+    `dlq:redrive --dry-run --limit 1 --idle-timeout-ms 2000`.
+  - `pnpm run start:cli -- outbox:inspect` - passed against the local stack.
+- Open issues: DLQ dry-run still emits the previously observed local KafkaJS
+  `TimeoutNegativeWarning`, but the command completed without republishing or
+  committing offsets.
+- Next action: proceed to the integration-suite and CI-hardening phase when
+  requested.

@@ -1,11 +1,9 @@
-import { NestFactory } from '@nestjs/core';
+import { CommandFactory } from 'nest-commander';
 
 import { CliModule } from './cli.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.createApplicationContext(CliModule);
-  app.enableShutdownHooks();
-  await app.close();
+  await CommandFactory.run(CliModule);
 }
 
 void bootstrap();

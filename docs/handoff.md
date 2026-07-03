@@ -2,12 +2,13 @@
 
 ## Current Status
 
-P4B is complete: Elasticsearch search library, search-indexer worker, and the API
-search endpoint are implemented and validated. pnpm build/test/lint are green with
-pnpm 11.1.1. The API supports authenticated message creation, cursor-paginated
-conversation message listing, and Elasticsearch-backed conversation search.
-Transactional outbox publishing and Kafka-backed indexing were manually verified
-locally. CLI commands are still not implemented.
+P5 is complete: the maintenance CLI runtime is implemented with
+`outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and `es:reindex`. pnpm
+build/test/lint are green with pnpm 11.1.1. The API supports authenticated
+message creation, cursor-paginated conversation message listing, and
+Elasticsearch-backed conversation search. Transactional outbox publishing,
+Kafka-backed indexing, and safe CLI dry-run commands were manually verified
+locally.
 
 ## Complete
 
@@ -72,11 +73,28 @@ locally. CLI commands are still not implemented.
     mapping, search-indexer happy path, unknown version skip, malformed event to
     DLQ, retryable/non-retryable ES errors, duplicate idempotent indexing, and API
     search validation/response/error mapping.
+- P5 is complete:
+  - `apps/cli` uses `nest-commander` and exposes `outbox:inspect`,
+    `outbox:redrive`, `dlq:redrive`, and `es:reindex`.
+  - CLI operation clients are lazy and command-scoped, so Mongo-only commands do
+    not connect Kafka producers or touch Elasticsearch aliases.
+  - `outbox:inspect` reports pending/publishing/published/failed counts, oldest
+    pending age, and a bounded failed-event summary.
+  - `outbox:redrive` defaults to dry-run, requires `--confirm` to update rows,
+    only selects `failed` rows, supports `--id`, `--event-id`, and `--limit`, and
+    never touches `published` rows.
+  - `dlq:redrive` defaults to dry-run, uses the dedicated group
+    `message-management-api.cli.dlq-redrive`, preserves original values and keys
+    when republishing to the main topic, and commits offsets only after confirmed
+    successful republish.
+  - `es:reindex` defaults to dry-run, creates a target versioned index on
+    confirmed runs, reindexes from `messages-read`, verifies counts, atomically
+    swaps `messages-read`/`messages-write`, and keeps the old index for rollback.
+  - `IndexManagerService` no longer moves existing aliases back to `messages-v1`
+    during startup, preserving operator-controlled reindex swaps.
 
 ## Remaining
 
-- CLI commands remain: `outbox:inspect`, `outbox:redrive`, `dlq:redrive`, and
-  `es:reindex`.
 - Full Testcontainers integration suite and CI hardening remain future phases.
 
 ## Known Issues
@@ -93,9 +111,13 @@ locally. CLI commands are still not implemented.
 - Local Elasticsearch may refuse new shard allocation if Docker disk usage is
   above the high watermark. During P4B smoke verification this made `messages-v1`
   red until `cluster.routing.allocation.disk.threshold_enabled=false` was applied
-  transiently and then restored after verification.
+  transiently and then restored after verification. The local debugging runbook
+  now includes this procedure.
 - Keep `@elastic/elasticsearch` pinned to 8.x while Compose runs Elasticsearch
   8.14.x; the 9.x client sends incompatible compatibility headers.
+- DLQ dry-run may emit the previously observed local KafkaJS
+  `TimeoutNegativeWarning`; the P5 smoke command still completed without
+  republishing or committing offsets.
 
 ## Last Commands
 
@@ -118,9 +140,20 @@ locally. CLI commands are still not implemented.
 - `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run format:check` - failed because pre-existing files outside the P4B slice are not Prettier-formatted.
 - `docker compose up -d mongodb mongodb-init kafka elasticsearch` - passed; all infra containers were healthy.
 - Manual P4B create-to-search verification - passed: host-run API on `PORT=3410`, outbox on `OUTBOX_HEALTH_PORT=3411`, and search-indexer on `INDEXER_HEALTH_PORT=3412` all reported readiness; POST created message `6a479ab73d530e785e1b76df`; search returned it from Elasticsearch through the API.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs add -w nest-commander` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run typecheck` - passed using pnpm 11.1.1.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run test --runInBand` - initially failed for CLI test env and alias-bootstrap test expectations; final rerun passed with 17 suites and 54 tests.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run lint` - initially failed for a non-Error Promise rejection in the DLQ service; final rerun passed.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run build` - passed using pnpm 11.1.1.
+- `docker compose ps` - passed; MongoDB, Kafka, and Elasticsearch were healthy.
+- `node dist/apps/cli/apps/cli/src/main.js outbox:inspect` with local host-run env - passed; reported 0 pending, 0 publishing, 3 published, 0 failed.
+- `node dist/apps/cli/apps/cli/src/main.js outbox:redrive --dry-run` with local host-run env - passed; matched 0 failed events and reset 0 rows.
+- `node dist/apps/cli/apps/cli/src/main.js es:reindex --dry-run` with local host-run env - passed; planned `messages-v2` from `messages-v1`, source count 1, no alias swap.
+- `node dist/apps/cli/apps/cli/src/main.js dlq:redrive --dry-run --limit 1 --idle-timeout-ms 2000` with local host-run env - passed; consumed 0, republished 0, committed 0, stopped on idle timeout.
+- `/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/apple/Library/pnpm/global/5/node_modules/pnpm/bin/pnpm.cjs run start:cli -- outbox:inspect` with local host-run env - passed.
 
 ## Next Step
 
-Proceed to the CLI slice only when requested: `outbox:inspect`, `outbox:redrive`,
-`dlq:redrive`, and `es:reindex`. Do not implement unrelated pipeline changes unless
-required for CLI type compatibility.
+Proceed to P6 only when requested: Testcontainers integration suite and CI
+hardening. Do not implement Kubernetes, UI, automated DLQ redrive, or schema
+registry.

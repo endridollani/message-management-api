@@ -71,6 +71,19 @@ readiness fails on MongoDB/Kafka.
 
 ## Manual Inspection
 
+Preferred CLI inspection:
+
+```sh
+MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
+KAFKA_BROKERS='localhost:9094' \
+ELASTICSEARCH_NODE='http://localhost:9200' \
+pnpm run start:cli -- outbox:inspect
+```
+
+The command prints pending/publishing/published/failed counts, oldest pending
+age, and a bounded summary of failed events. Use `--failed-limit N` to change
+the failed-event summary size.
+
 Pending rows:
 
 ```sh
@@ -97,10 +110,36 @@ docker compose exec kafka /opt/bitnami/kafka/bin/kafka-console-consumer.sh \
 
 ## Redrive
 
-CLI redrive is not implemented in P4A. Until the CLI slice lands, redrive is a
-manual operator action: inspect failed rows first, then reset selected known-safe
-rows to `pending` with a future `nextAttemptAt` and clear lock fields. Do not
-bulk-reset all failed rows.
+Failed rows are terminal until an operator explicitly redrives selected rows.
+Preview first:
+
+```sh
+MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
+KAFKA_BROKERS='localhost:9094' \
+ELASTICSEARCH_NODE='http://localhost:9200' \
+pnpm run start:cli -- outbox:redrive --dry-run
+```
+
+Apply only after the poison cause is understood:
+
+```sh
+MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
+KAFKA_BROKERS='localhost:9094' \
+ELASTICSEARCH_NODE='http://localhost:9200' \
+pnpm run start:cli -- outbox:redrive --event-id <event-id> --confirm
+```
+
+Supported selectors:
+
+- `--event-id <csv>`: one or more outbox `eventId` values.
+- `--id <csv>`: one or more MongoDB outbox `_id` values.
+- `--limit N`: oldest failed rows first.
+
+Without `--confirm`, the command is a dry-run. With `--confirm` and no explicit
+ID selector, pass `--limit N`; this prevents accidental unbounded bulk redrive.
+The command only matches `status: failed`, resets selected rows to `pending`,
+sets `attempts` to `0`, sets `nextAttemptAt` to now, and clears lock/error
+fields. It never touches `published` rows.
 
 ## Scale-Out
 

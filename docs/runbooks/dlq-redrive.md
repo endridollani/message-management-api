@@ -2,9 +2,10 @@
 
 ## Current Status
 
-P4B implements DLQ publishing from the search-indexer to
-`messages.message-created.v1.dlq`. The `dlq:redrive` CLI command is still pending,
-so redrive is not yet an executable repo command.
+The search-indexer publishes poison records to
+`messages.message-created.v1.dlq`. The maintenance CLI can redrive a bounded DLQ
+window back to `messages.message-created.v1` after the poison cause has been
+fixed or judged safe.
 
 ## DLQ Entry Causes
 
@@ -43,10 +44,41 @@ docker compose exec kafka kafka-console-consumer.sh \
 
 ## Redrive
 
-CLI redrive remains pending. Until `dlq:redrive` exists, do not bulk-republish DLQ
-records manually unless the poison cause has been fixed and ordering implications
-are understood. Indexing is idempotent by message id, but redriven ordering across
-a DLQ window is best effort.
+Preview first:
+
+```bash
+KAFKA_BROKERS='localhost:9094' \
+MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
+ELASTICSEARCH_NODE='http://localhost:9200' \
+pnpm run start:cli -- dlq:redrive --dry-run --limit 10
+```
+
+Apply a bounded redrive:
+
+```bash
+KAFKA_BROKERS='localhost:9094' \
+MONGODB_URI='mongodb://localhost:27017/message_management?replicaSet=rs0&directConnection=true' \
+ELASTICSEARCH_NODE='http://localhost:9200' \
+pnpm run start:cli -- dlq:redrive --limit 10 --confirm
+```
+
+Options:
+
+- `--limit N`: maximum DLQ records to inspect or redrive; default `100`.
+- `--idle-timeout-ms N`: stop after no DLQ records arrive for this long; default
+  `5000`.
+- `--dry-run`: consume without republishing or committing offsets.
+- `--confirm`: republish and commit offsets after each successful publish.
+
+The command uses the dedicated consumer group
+`message-management-api.cli.dlq-redrive`, subscribes from the beginning for the
+first run, republishes each original DLQ value to
+`messages.message-created.v1`, and preserves the original Kafka key when present.
+Dry-runs do not republish and do not commit offsets.
+
+Ordering across a redriven DLQ window is best-effort. That is acceptable for this
+pipeline because Elasticsearch indexing is idempotent by `message.id`; duplicate
+or delayed redelivery converges on the same document.
 
 ## Verification
 
