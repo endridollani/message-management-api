@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 
 COPY . .
-RUN pnpm run build && pnpm prune --prod
+RUN pnpm run build && pnpm prune --prod --ignore-scripts
 
 FROM node:22-alpine AS runtime-base
 

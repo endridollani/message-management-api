@@ -142,6 +142,13 @@ directly. `pnpm install`, `typecheck`, `lint`, `test:unit`, `test:ci`, and
 `build` passed. Manual hook checks passed: `pre-commit` invoked lint-staged, and
 `pre-push` ran only `typecheck`, `lint`, `test:unit`, and `build`.
 
+Post-hook Docker CI fix: the Docker build stage now runs
+`pnpm prune --prod --ignore-scripts`. This avoids rerunning the root
+`prepare: husky` lifecycle after dev dependencies have been pruned, which made
+the GitHub Actions docker-build job fail with `sh: husky: not found`. Local
+Docker validation passed for the `api`, `outbox-publisher`, `search-indexer`,
+and `cli` targets.
+
 ## Runtime Smoke Result
 
 Clean local stack smoke passed after `docker compose down -v` and a fresh

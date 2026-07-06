@@ -519,3 +519,18 @@ Append one entry after each completed Section 20 phase. Keep entries factual: sc
 - Open issues: ambient `pnpm` still reports 11.7.0 and `corepack pnpm` still
   fails locally under Node 26, so validation placed the cached pnpm 11.1.1
   executable first on `PATH` for manual hook checks.
+
+## 2026-07-06 - Fixed Docker prune after Husky setup
+
+- Scope: fixed the GitHub Actions docker-build regression introduced by the
+  Husky `prepare` lifecycle. `pnpm prune --prod` removes dev dependencies and
+  then reruns root lifecycle scripts, so `prepare: husky` failed in the Docker
+  build stage after `husky` had been pruned. The Docker build now prunes
+  production dependencies with `--ignore-scripts`.
+- Files touched: `Dockerfile`, `docs/handoff.md`, and `docs/progress-log.md`.
+- Validation:
+  - `docker build --target api -t message-management-api:api .` - passed.
+  - `docker build --target outbox-publisher -t message-management-api:outbox-publisher .` - passed.
+  - `docker build --target search-indexer -t message-management-api:search-indexer .` - passed.
+  - `docker build --target cli -t message-management-api:cli .` - passed.
+- Open issues: none.
